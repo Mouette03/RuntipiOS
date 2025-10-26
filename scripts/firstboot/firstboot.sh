@@ -2,7 +2,7 @@
 set -e
 
 # RuntipiOS First Boot Configuration Script
-# This script runs on the first boot to configure the system
+# This script runs on the first boot to configure the system using WiFi Connect
 
 LOG_FILE="/var/log/runtipios-firstboot.log"
 CONFIGURED_FLAG="/var/lib/runtipios/configured"
@@ -22,20 +22,12 @@ fi
 # Wait for system to be ready
 sleep 5
 
-# Check if running in graphical environment
-if [ -n "$DISPLAY" ] || systemctl is-active --quiet graphical.target; then
-    echo "==> Launching graphical configuration..."
-    /opt/runtipios/gui-installer.py
-else
-    echo "==> Launching text-based configuration..."
-    /opt/runtipios/text-installer.sh
-fi
-
-# Install Runtipi
-echo "==> Installing Runtipi..."
-/opt/runtipios/install-runtipi.sh
+# Use WiFi Connect orchestrator for configuration
+echo "==> Starting WiFi Connect orchestration..."
+/opt/runtipios/wifi-connect-orchestrator.sh
 
 # Mark as configured
+mkdir -p "$(dirname "$CONFIGURED_FLAG")"
 touch "$CONFIGURED_FLAG"
 echo "==> First boot configuration complete!"
 

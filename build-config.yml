@@ -48,6 +48,13 @@ packages:
   - python3-pip
   - dialog
   - whiptail
+  
+  # WiFi Connect dependencies
+  - dnsmasq
+  - hostapd
+  - python3-flask
+  - python3-requests
+  - python3-netifaces
 
 # Runtipi configuration
 runtipi:
@@ -61,3 +68,12 @@ firstboot:
   create_user: true
   configure_network: true
   install_runtipi: true
+  
+# WiFi Connect configuration
+wifi_connect:
+  enabled: true
+  portal_ssid: "RuntipiOS-Setup"
+  portal_password: ""
+  portal_interface: wlan0
+  portal_address: 192.168.42.1
+  portal_dhcp_range: "192.168.42.10,192.168.42.100"

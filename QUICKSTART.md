@@ -52,14 +52,22 @@ Use `diskutil list` to find the correct disk.
 2. **Boot from USB** (usually press F12, F2, DEL, or ESC during boot)
 3. **Select "RuntipiOS"** from the boot menu
 4. **Wait for the system to load** (this may take a minute)
-5. **Follow the configuration wizard**:
+5. **WiFi Connect Setup**:
    
-   The graphical wizard will ask you for:
-   - **WiFi credentials** (only if no ethernet connection is detected)
-   - **Username** for SSH access (default: `runtipi`)
-   - **Password** for the user account
+   If no network connection is detected:
+   - The system creates a WiFi access point named **"RuntipiOS-Setup"**
+   - Connect to this network with your phone/laptop
+   - A captive portal opens automatically (or navigate to http://192.168.42.1)
+   - Configure your settings through the web interface:
+     - Select your WiFi network from the list
+     - Enter WiFi password
+     - Create SSH username (default: `runtipi`)
+     - Set user password
+   - Click "Configure RuntipiOS"
    
-6. **Wait for Runtipi to install** (this happens automatically)
+   If ethernet is connected, the system proceeds automatically to installation.
+   
+6. **Wait for Runtipi to install** (this happens automatically, takes 5-10 minutes)
 7. **Note the connection address** displayed on screen
 
 ## First Login

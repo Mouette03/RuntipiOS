@@ -200,6 +200,28 @@ apply_network_config() {
     return 0
 }
 
+# Start status page
+start_status_page() {
+    echo "==> Starting status page..."
+    
+    # Start status page on port 8080
+    /opt/runtipios/status-page.py &
+    STATUS_PID=$!
+    echo "$STATUS_PID" > /tmp/status-page.pid
+    
+    echo "==> Status page started at http://<ip>:8080"
+}
+
+# Stop status page
+stop_status_page() {
+    echo "==> Stopping status page..."
+    
+    if [ -f /tmp/status-page.pid ]; then
+        kill "$(cat /tmp/status-page.pid)" 2>/dev/null || true
+        rm -f /tmp/status-page.pid
+    fi
+}
+
 # Main orchestration logic
 main() {
     STATE=$(get_state)
@@ -232,8 +254,13 @@ main() {
             # Proceed to installation
             if [ "$(get_state)" = "install" ]; then
                 echo "==> Proceeding to Runtipi installation"
+                # Start status page
+                start_status_page
                 /opt/runtipios/install-runtipi.sh
                 set_state "complete"
+                # Keep status page running for viewing
+                sleep 300  # Keep it running for 5 minutes
+                stop_status_page
             fi
             ;;
             
@@ -243,8 +270,11 @@ main() {
                 set_state "configure"
                 apply_network_config
                 set_state "install"
+                start_status_page
                 /opt/runtipios/install-runtipi.sh
                 set_state "complete"
+                sleep 300
+                stop_status_page
             fi
             ;;
             

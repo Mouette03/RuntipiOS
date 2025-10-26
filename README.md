@@ -72,8 +72,9 @@ RuntipiOS uses a captive portal system inspired by Balena WiFi Connect for easy 
 2. **Captive Portal Mode**: If no connection is found, the system creates a WiFi access point named "RuntipiOS-Setup"
 3. **Web Configuration**: Connect to the access point and a captive portal opens automatically at http://192.168.42.1
 4. **Setup Process**: Configure your WiFi network, SSH credentials, and other settings through the web interface
-5. **Automatic Installation**: Once configured, the system automatically connects to your WiFi and installs Runtipi
-6. **Operational Mode**: After setup, the system switches to normal operational mode
+5. **Installation Status**: After configuration, a status page shows real-time installation progress at http://<ip>:8080
+6. **Automatic Installation**: The system automatically connects to your WiFi and installs Runtipi
+7. **Operational Mode**: After setup, the system switches to normal operational mode
 
 ### Customizing WiFi Connect
 
@@ -164,6 +165,7 @@ RuntipiOS/
 │       ├── wifi-connect-orchestrator.sh  # WiFi Connect orchestration
 │       ├── wifi-connect-portal.py        # Captive portal web interface
 │       ├── wifi-connect.service          # systemd service for WiFi Connect
+│       ├── status-page.py                # Installation status page
 │       ├── gui-installer.py # Graphical configuration wizard (legacy)
 │       ├── text-installer.sh # Text-based configuration (legacy)
 │       └── install-runtipi.sh # Runtipi installation

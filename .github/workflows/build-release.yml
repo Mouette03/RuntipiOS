@@ -1,0 +1,131 @@
+name: Build and Release RuntipiOS
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag for the release'
+        required: false
+        default: 'dev'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-iso:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/v}
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+          
+      - name: Update version in build config
+        run: |
+          sed -i "s/version: .*/version: ${{ steps.version.outputs.version }}/" build-config.yml
+          
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          load: true
+          tags: runtipios-builder:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          
+      - name: Build ISO
+        run: |
+          # Create output directory
+          mkdir -p output
+          
+          # Run the builder container with privileged mode
+          docker run --rm --privileged \
+            -v $(pwd)/output:/build/output \
+            runtipios-builder:latest
+            
+      - name: Get ISO filename
+        id: iso
+        run: |
+          ISO_FILE=$(ls output/*.iso | head -1)
+          ISO_NAME=$(basename "$ISO_FILE")
+          echo "file=$ISO_FILE" >> $GITHUB_OUTPUT
+          echo "name=$ISO_NAME" >> $GITHUB_OUTPUT
+          echo "Built ISO: $ISO_NAME"
+          
+      - name: Generate checksums
+        run: |
+          cd output
+          sha256sum *.iso > SHA256SUMS
+          cat SHA256SUMS
+          
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            output/*.iso
+            output/SHA256SUMS
+          body: |
+            ## RuntipiOS Release ${{ steps.version.outputs.version }}
+            
+            ### What's Included
+            - Lightweight Debian-based OS
+            - Graphical configuration wizard for:
+              - WiFi setup (if no ethernet)
+              - SSH user creation
+              - Password configuration
+            - Automatic Runtipi installation
+            - Connection address display
+            
+            ### Installation
+            1. Download the ISO file
+            2. Write it to a USB drive using tools like Balena Etcher or `dd`
+            3. Boot from the USB drive
+            4. Follow the on-screen configuration wizard
+            5. Access Runtipi at the displayed address
+            
+            ### Checksums
+            See SHA256SUMS file for verification
+            
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Upload artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtipios-${{ steps.version.outputs.version }}
+          path: |
+            output/*.iso
+            output/SHA256SUMS
+          retention-days: 30

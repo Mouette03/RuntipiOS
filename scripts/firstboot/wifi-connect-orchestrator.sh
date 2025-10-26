@@ -20,6 +20,7 @@ PORTAL_INTERFACE="${PORTAL_INTERFACE:-wlan0}"
 PORTAL_ADDRESS="${PORTAL_ADDRESS:-192.168.42.1}"
 PORTAL_DHCP_RANGE="${PORTAL_DHCP_RANGE:-192.168.42.10,192.168.42.100}"
 PORTAL_PORT="${PORTAL_PORT:-80}"
+STATUS_PAGE_TIMEOUT=300  # Keep status page running for 5 minutes after installation
 
 # State management
 get_state() {
@@ -259,7 +260,7 @@ main() {
                 /opt/runtipios/install-runtipi.sh
                 set_state "complete"
                 # Keep status page running for viewing
-                sleep 300  # Keep it running for 5 minutes
+                sleep $STATUS_PAGE_TIMEOUT
                 stop_status_page
             fi
             ;;
@@ -273,7 +274,7 @@ main() {
                 start_status_page
                 /opt/runtipios/install-runtipi.sh
                 set_state "complete"
-                sleep 300
+                sleep $STATUS_PAGE_TIMEOUT
                 stop_status_page
             fi
             ;;

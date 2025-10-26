@@ -313,9 +313,9 @@ def get_system_info():
     """Get system information"""
     try:
         # Get IP address
-        result = subprocess.run(['hostname', '-I'], capture_output=True, text=True)
+        result = subprocess.run(['hostname', '-I'], capture_output=True, text=True, timeout=5)
         ip_address = result.stdout.strip().split()[0] if result.stdout else "unknown"
-    except:
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, IndexError):
         ip_address = "unknown"
     
     # Get username from config
@@ -326,7 +326,7 @@ def get_system_info():
             with open(config_file, 'r') as f:
                 config = json.load(f)
                 username = config.get('username', 'runtipi')
-        except:
+        except (IOError, json.JSONDecodeError):
             pass
     
     return {
@@ -349,8 +349,10 @@ def status():
     )
 
 def main():
+    # Get port from environment variable or default to 8080
+    port = int(os.environ.get('STATUS_PAGE_PORT', '8080'))
     # Run Flask app
-    app.run(host='0.0.0.0', port=8080, debug=False)
+    app.run(host='0.0.0.0', port=port, debug=False)
 
 if __name__ == '__main__':
     main()

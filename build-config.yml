@@ -1,0 +1,63 @@
+# RuntipiOS Build Configuration
+# Modify this file to customize the build
+
+# Base system configuration
+base:
+  distribution: debian
+  release: bookworm
+  architecture: amd64
+  
+# ISO configuration
+iso:
+  name: RuntipiOS
+  version: 1.0.0
+  label: RUNTIPIOS
+  
+# Packages to include
+packages:
+  # Base system
+  - linux-image-amd64
+  - live-boot
+  - systemd-sysv
+  
+  # Network tools
+  - network-manager
+  - wireless-tools
+  - wpasupplicant
+  - iw
+  - rfkill
+  
+  # SSH
+  - openssh-server
+  
+  # System utilities
+  - sudo
+  - curl
+  - wget
+  - git
+  - vim
+  - nano
+  
+  # Docker for Runtipi
+  - docker.io
+  - docker-compose
+  
+  # GUI for installer
+  - python3
+  - python3-tk
+  - python3-pip
+  - dialog
+  - whiptail
+
+# Runtipi configuration
+runtipi:
+  repository: https://github.com/runtipi/runtipi
+  install_path: /opt/runtipi
+  auto_start: true
+  
+# First boot configuration
+firstboot:
+  enable_ssh: true
+  create_user: true
+  configure_network: true
+  install_runtipi: true

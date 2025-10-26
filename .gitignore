@@ -1,0 +1,19 @@
+# Build artifacts
+build/
+output/
+*.iso
+*.img
+*.log
+
+# Temporary files
+tmp/
+*.tmp
+*.swp
+*~
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Dependencies
+node_modules/

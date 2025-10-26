@@ -26,8 +26,8 @@ WORKDIR /build
 COPY build-config.yml /build/
 COPY scripts/ /build/scripts/
 
-# Set executable permissions
-RUN chmod +x /build/scripts/*.sh
+# Set executable permissions for all scripts including subdirectories
+RUN find /build/scripts -type f \( -name "*.sh" -o -name "*.py" \) -exec chmod +x {} \;
 
 # Build script will be run with docker run
 CMD ["/build/scripts/build-iso.sh"]

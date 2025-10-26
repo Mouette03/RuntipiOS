@@ -504,8 +504,9 @@ def scan_networks():
         unique_networks.sort(key=lambda x: int(x['signal']), reverse=True)
         
         return jsonify({'success': True, 'networks': unique_networks})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+    except Exception:
+        # Don't expose internal error details to users
+        return jsonify({'success': False, 'error': 'Failed to scan for networks'})
 
 @app.route('/api/configure', methods=['POST'])
 def configure():
@@ -529,8 +530,9 @@ def configure():
             }, f)
         
         return jsonify({'success': True})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+    except Exception:
+        # Don't expose internal error details to users
+        return jsonify({'success': False, 'error': 'Failed to save configuration'})
 
 def main():
     # Run Flask app

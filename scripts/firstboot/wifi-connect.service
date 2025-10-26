@@ -1,0 +1,24 @@
+# RuntipiOS WiFi Connect Service
+# Smart systemd service that switches between configuration mode and operational mode
+
+[Unit]
+Description=RuntipiOS WiFi Connect Service
+After=network.target NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=simple
+ExecStart=/opt/runtipios/wifi-connect-orchestrator.sh
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Environment
+Environment="PORTAL_SSID=RuntipiOS-Setup"
+Environment="PORTAL_INTERFACE=wlan0"
+Environment="PORTAL_ADDRESS=192.168.42.1"
+Environment="PORTAL_DHCP_RANGE=192.168.42.10,192.168.42.100"
+
+[Install]
+WantedBy=multi-user.target

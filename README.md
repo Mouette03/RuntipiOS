@@ -1,15 +1,16 @@
 # RuntipiOS
 Runtipi System OS
 
-A lightweight Debian-based operating system with automatic Runtipi installation and graphical configuration.
+A lightweight Debian-based operating system with automatic Runtipi installation and captive portal WiFi configuration.
 
 ## Features
 
 - **Lightweight**: Based on Debian Bookworm, minimal installation without UI
-- **Graphical Configuration**: Easy-to-use setup wizard that asks for:
-  - WiFi configuration (if no ethernet connection)
-  - SSH user creation
-  - Password setup
+- **WiFi Connect**: Captive portal for easy WiFi configuration using Balena-inspired technology
+  - Automatic network detection
+  - WiFi captive portal when no connection is available
+  - Modern web-based configuration interface
+  - Intelligent mode switching between setup and operational modes
 - **Automatic Runtipi Installation**: Runtipi is automatically installed and started
 - **Connection Display**: The system displays the Runtipi connection address after installation
 - **GitHub Actions**: Automated builds and releases via GitHub workflows
@@ -43,10 +44,13 @@ The ISO file will be created in the `output/` directory.
    Replace `/dev/sdX` with your USB drive (e.g., `/dev/sdb`)
 
 3. Boot from the USB drive
-4. Follow the graphical configuration wizard:
-   - Configure WiFi (if needed)
-   - Create SSH user
-   - Set password
+4. The system will automatically:
+   - Detect network connectivity
+   - If no network is found, start a WiFi captive portal
+   - Connect to WiFi network "RuntipiOS-Setup"
+   - Open a web browser to http://192.168.42.1
+   - Configure WiFi credentials and SSH user through the web interface
+   - Automatically install and configure Runtipi
 
 5. The system will automatically install Runtipi and display the connection address
 
@@ -57,6 +61,42 @@ After installation, Runtipi will be accessible at:
 - `http://localhost` (if accessing from the machine itself)
 
 You can also SSH into the system using the credentials you configured.
+
+## WiFi Connect Configuration
+
+RuntipiOS uses a captive portal system inspired by Balena WiFi Connect for easy network configuration.
+
+### How It Works
+
+1. **Network Detection**: On first boot, the system automatically detects if a network connection is available
+2. **Captive Portal Mode**: If no connection is found, the system creates a WiFi access point named "RuntipiOS-Setup"
+3. **Web Configuration**: Connect to the access point and a captive portal opens automatically at http://192.168.42.1
+4. **Setup Process**: Configure your WiFi network, SSH credentials, and other settings through the web interface
+5. **Installation Status**: After configuration, a status page shows real-time installation progress at http://<ip>:8080
+6. **Automatic Installation**: The system automatically connects to your WiFi and installs Runtipi
+7. **Operational Mode**: After setup, the system switches to normal operational mode
+
+### Customizing WiFi Connect
+
+You can customize the captive portal settings in `build-config.yml`:
+
+```yaml
+wifi_connect:
+  enabled: true
+  portal_ssid: "RuntipiOS-Setup"      # Name of the setup WiFi network
+  portal_password: ""                  # Leave empty for open network
+  portal_interface: wlan0              # WiFi interface to use
+  portal_address: 192.168.42.1        # IP address of the portal
+  portal_dhcp_range: "192.168.42.10,192.168.42.100"  # DHCP range
+```
+
+### Manual Configuration
+
+If you need to reconfigure the network after installation, you can restart the WiFi Connect service:
+
+```bash
+sudo systemctl restart wifi-connect.service
+```
 
 ## Configuration
 
@@ -122,8 +162,12 @@ RuntipiOS/
 │   ├── setup-bootloader.sh  # Bootloader configuration
 │   └── firstboot/           # First boot scripts
 │       ├── firstboot.sh     # Main first-boot script
-│       ├── gui-installer.py # Graphical configuration wizard
-│       ├── text-installer.sh # Text-based configuration
+│       ├── wifi-connect-orchestrator.sh  # WiFi Connect orchestration
+│       ├── wifi-connect-portal.py        # Captive portal web interface
+│       ├── wifi-connect.service          # systemd service for WiFi Connect
+│       ├── status-page.py                # Installation status page
+│       ├── gui-installer.py # Graphical configuration wizard (legacy)
+│       ├── text-installer.sh # Text-based configuration (legacy)
 │       └── install-runtipi.sh # Runtipi installation
 └── .github/
     └── workflows/

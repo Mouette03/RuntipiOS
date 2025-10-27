@@ -1,6 +1,4 @@
 # Dockerfile
-
-```dockerfile
 FROM debian:bookworm-slim
 
 ARG BUILD_DATE

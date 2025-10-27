@@ -8,7 +8,6 @@ RUN apt-get update && apt-get install -y \
     isolinux \
     syslinux-efi \
     grub-pc-bin \
-    grub-efi-amd64-bin \
     mtools \
     dosfstools \
     rsync \
@@ -23,10 +22,11 @@ RUN apt-get update && apt-get install -y \
     kpartx \
     parted \
     e2fsprogs \
-    dosfstools \
+    # dosfstools already installed above
     kmod \
     util-linux \
-    grub-efi-arm64 \
+    # grub-efi packages are architecture-specific and will be installed inside
+    # the target chroot (arm64 or amd64) rather than in the builder image.
     && rm -rf /var/lib/apt/lists/*
 
 # Create working directory

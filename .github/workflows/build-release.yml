@@ -18,253 +18,168 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build-iso:
+  build-image:
     runs-on: ubuntu-latest
     permissions:
       contents: write
       packages: write
-      
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      repo_lower: ${{ steps.repo.outputs.repo_lower }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        
+
+      - name: Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION_RAW="${{ github.event.inputs.version }}"
+          elif [ "${{ github.event_name }}" = "release" ]; then
+            VERSION_RAW="${{ github.event.release.tag_name }}"
+          else
+            if echo "$GITHUB_REF" | grep -q "^refs/tags/"; then
+              VERSION_RAW=${GITHUB_REF#refs/tags/}
+            elif echo "$GITHUB_REF" | grep -q "^refs/heads/"; then
+              VERSION_RAW=${GITHUB_REF#refs/heads/}
+            else
+              VERSION_RAW=$GITHUB_REF
+            fi
+          fi
+          VERSION=${VERSION_RAW#v}
+          VERSION=${VERSION#V}
+          SANITIZED=$(echo "$VERSION" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_.-]/-/g')
+          SANITIZED=$(echo "$SANITIZED" | sed 's/^-*//;s/-*$//')
+          echo "version=$SANITIZED" >> $GITHUB_OUTPUT
+          echo "version_raw=$VERSION_RAW" >> $GITHUB_OUTPUT
+          echo "Building version: ${SANITIZED} (raw: ${VERSION_RAW})"
+
+      - name: Sanitize repository name for tags
+        id: repo
+        run: |
+          REPO="${{ github.repository }}"
+          REPO_LC=$(echo "$REPO" | tr '[:upper:]' '[:lower:]')
+          echo "repo_lower=$REPO_LC" >> $GITHUB_OUTPUT
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        
+
       - name: Log in to Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-          
-      - name: Extract version
-        id: version
-        run: |
-          # Determine a safe version string to use for image tags and release names.
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION_RAW="${{ github.event.inputs.version }}"
-          else
-            # If this was triggered by a tag, strip the refs/tags/ prefix
-            if echo "$GITHUB_REF" | grep -q "^refs/tags/"; then
-              VERSION_RAW=${GITHUB_REF#refs/tags/}
-            elif echo "$GITHUB_REF" | grep -q "^refs/heads/"; then
-              # For branch pushes, use the branch name (not the full ref)
-              VERSION_RAW=${GITHUB_REF#refs/heads/}
-            else
-              VERSION_RAW=$GITHUB_REF
-            fi
-          fi
 
-          # Strip any leading 'v' or 'V'
-          VERSION=${VERSION_RAW#v}
-          VERSION=${VERSION#V}
-
-          # Convert to lowercase and replace any characters not allowed in a Docker tag
-          # (allowed: [A-Za-z0-9_.-]) -> convert others to '-'
-          SANITIZED=$(echo "$VERSION" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_.-]/-/g')
-
-          # Trim leading/trailing hyphens
-          SANITIZED=$(echo "$SANITIZED" | sed 's/^-*//;s/-*$//')
-
-          echo "version=${SANITIZED}" >> $GITHUB_OUTPUT
-          echo "version_raw=${VERSION_RAW}" >> $GITHUB_OUTPUT
-          echo "Building version: ${SANITIZED} (raw: ${VERSION_RAW})"
-          
-      - name: Update version in build config
-        run: |
-          # Safely update version in build-config.yml. Escape any '/' or '&' characters
-          # in the replacement string so sed's substitute doesn't break when the
-          # version contains slashes or other special chars.
-          VER="${{ steps.version.outputs.version }}"
-          ESCAPED_VER=$(printf '%s' "$VER" | sed 's/[\/&]/\\&/g')
-          sed -i "s/version: .*/version: $ESCAPED_VER/" build-config.yml
-
-      - name: Sanitize repository name for tags
-        id: repo
-        run: |
-          # github.repository may contain uppercase letters; Docker/GHCR requires lowercase
-          REPO="${{ github.repository }}"
-          REPO_LC=$(echo "$REPO" | tr '[:upper:]' '[:lower:]')
-          echo "repo_lower=$REPO_LC" >> $GITHUB_OUTPUT
-          
-      - name: Build Docker image
+      - name: Build and push builder image to GHCR
         uses: docker/build-push-action@v5
         with:
           context: .
-          # Push the built image to the registry when building for a tag, otherwise
-          # load it into the runner for local use. This avoids unnecessary pushes
-          # on PRs or manual runs.
-          push: ${{ startsWith(github.ref, 'refs/tags/') }}
-          load: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          push: true
           tags: |
             ${{ env.REGISTRY }}/${{ steps.repo.outputs.repo_lower }}:build-${{ steps.version.outputs.version }}
             ${{ env.REGISTRY }}/${{ steps.repo.outputs.repo_lower }}:v${{ steps.version.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Make GHCR package public
-        if: startsWith(github.ref, 'refs/tags/')
-        env:
-          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+  build-iso:
+    needs: build-image
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare output directory
+        run: mkdir -p output
+
+      - name: Pull builder image
         run: |
-          set -e
-          OWNER=${{ github.repository_owner }}
-          PACKAGE=${{ github.event.repository.name }}
-          # Convert owner and package to lowercase for API paths
-          OWNER_LC=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
-          PACKAGE_LC=$(echo "$PACKAGE" | tr '[:upper:]' '[:lower:]')
-          echo "Attempting to set package visibility for ${PACKAGE_LC} under ${OWNER_LC} to public"
-          # Try organization endpoint first
-          ORG_URL="https://api.github.com/orgs/${OWNER_LC}/packages/container/${PACKAGE_LC}/visibility"
-          USER_URL="https://api.github.com/user/packages/container/${PACKAGE_LC}/visibility"
-
-          echo "Trying org endpoint: $ORG_URL"
-          CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PUT -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GHCR_TOKEN}" $ORG_URL -d '{"visibility":"public"}')
-          if [ "$CODE" = "200" ] || [ "$CODE" = "201" ]; then
-            echo "Package visibility set to public via org endpoint"
-            exit 0
-          fi
-
-          echo "Org endpoint returned $CODE, trying user endpoint: $USER_URL"
-          CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PUT -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GHCR_TOKEN}" $USER_URL -d '{"visibility":"public"}')
-          if [ "$CODE" = "200" ] || [ "$CODE" = "201" ]; then
-            echo "Package visibility set to public via user endpoint"
-            exit 0
-          fi
-
-          echo "Failed to set package visibility (last HTTP code: $CODE). Ensure secret GHCR_TOKEN is set and has 'packages:write' scope."
-          exit 1
-          
-      - name: Build ISO
-        run: |
-          # Create output directory
-          mkdir -p output
-          
-          # Run the builder container with privileged mode
-          # Use the GHCR image tag produced by the previous step. If the image
-          # isn't available locally, attempt to pull it (we are already logged
-          # into ghcr.io earlier in the workflow).
-          IMAGE=${{ env.REGISTRY }}/${{ steps.repo.outputs.repo_lower }}:build-${{ steps.version.outputs.version }}
+          IMAGE=${{ env.REGISTRY }}/${{ needs.build-image.outputs.repo_lower }}:build-${{ needs.build-image.outputs.version }}
           echo "Using builder image: $IMAGE"
           docker pull $IMAGE || true
-          docker run --rm --privileged \
-            -v $(pwd)/output:/build/output \
-            $IMAGE
-            
-      - name: Get ISO filename
-        id: iso
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+
+      - name: Run builder for ${{ matrix.arch }}
         run: |
-          ISO_FILE=$(ls output/*.iso | head -1)
-          ISO_NAME=$(basename "$ISO_FILE")
-          echo "file=$ISO_FILE" >> $GITHUB_OUTPUT
-          echo "name=$ISO_NAME" >> $GITHUB_OUTPUT
-          echo "Built ISO: $ISO_NAME"
-          
+          IMAGE=${IMAGE}
+          mkdir -p output
+          if [ "${{ matrix.arch }}" = "amd64" ]; then
+            echo "Running build-iso.sh for amd64"
+            docker run --rm --privileged \
+              -e ARCH=amd64 \
+              -v $(pwd)/output:/build/output \
+              $IMAGE /bin/bash -lc "/build/scripts/build-iso.sh"
+          else
+            echo "Running build-arm-image.sh (generic arm64 image)"
+            docker run --rm --privileged \
+              -e ARCH=arm64 \
+              -v $(pwd)/output:/build/output \
+              $IMAGE /bin/bash -lc "/build/scripts/build-arm-image.sh"
+
+            echo "Running build-pi-image.sh (Raspberry-style image)"
+            docker run --rm --privileged \
+              -e ARCH=arm64 \
+              -v $(pwd)/output:/build/output \
+              $IMAGE /bin/bash -lc "/build/scripts/build-pi-image.sh"
+          fi
+
       - name: Generate checksums
         run: |
           cd output
-          sha256sum *.iso > SHA256SUMS
+          sha256sum * > SHA256SUMS
           cat SHA256SUMS
 
-      - name: Verify ISO built
-        run: |
-          set -e
-          ISO_FILE=$(ls output/*.iso 2>/dev/null | head -1 || true)
-          if [ -z "$ISO_FILE" ]; then
-            echo "ERROR: no ISO found in output/ — failing the job"
-            ls -la output || true
-            exit 1
-          fi
-          echo "Found ISO: $ISO_FILE"
-
-      - name: Create tag (for manual dispatch)
-        if: github.event_name == 'workflow_dispatch' && steps.version.outputs.version != 'dev' && !startsWith(github.ref, 'refs/tags/')
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -e
-          VERSION=${{ steps.version.outputs.version }}
-          echo "Creating and pushing tag v${VERSION}"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "v${VERSION}" -m "Release v${VERSION}"
-          git push origin "v${VERSION}"
-
-      - name: Create Release (manual dispatch)
-        if: github.event_name == 'workflow_dispatch' && steps.version.outputs.version != 'dev'
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v${{ steps.version.outputs.version }}
-          files: |
-            output/*.iso
-            output/SHA256SUMS
-          body: |
-            ## RuntipiOS Release ${{ steps.version.outputs.version }}
-            
-            ### What's Included
-            - Lightweight Debian-based OS
-            - Graphical configuration wizard for:
-              - WiFi setup (if no ethernet)
-              - SSH user creation
-              - Password configuration
-            - Automatic Runtipi installation
-            - Connection address display
-            
-            ### Installation
-            1. Download the ISO file
-            2. Write it to a USB drive using tools like Balena Etcher or `dd`
-            3. Boot from the USB drive
-            4. Follow the on-screen configuration wizard
-            5. Access Runtipi at the displayed address
-            
-            ### Checksums
-            See SHA256SUMS file for verification
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
-      - name: Create Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            output/*.iso
-            output/SHA256SUMS
-          body: |
-            ## RuntipiOS Release ${{ steps.version.outputs.version }}
-            
-            ### What's Included
-            - Lightweight Debian-based OS
-            - Graphical configuration wizard for:
-              - WiFi setup (if no ethernet)
-              - SSH user creation
-              - Password configuration
-            - Automatic Runtipi installation
-            - Connection address display
-            
-            ### Installation
-            1. Download the ISO file
-            2. Write it to a USB drive using tools like Balena Etcher or `dd`
-            3. Boot from the USB drive
-            4. Follow the on-screen configuration wizard
-            5. Access Runtipi at the displayed address
-            
-            ### Checksums
-            See SHA256SUMS file for verification
-            
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
       - name: Upload artifact
-        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: runtipios-${{ steps.version.outputs.version }}
+          name: runtipios-${{ matrix.arch }}-${{ needs.build-image.outputs.version }}
           path: |
-            output/*.iso
-            output/SHA256SUMS
+            output/*
           retention-days: 30
+
+  create-release:
+    needs: build-iso
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && needs.build-image.outputs.version != 'dev')
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download amd64 artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: runtipios-amd64-${{ needs.build-image.outputs.version }}
+          path: artifacts/amd64
+
+      - name: Download arm64 artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: runtipios-arm64-${{ needs.build-image.outputs.version }}
+          path: artifacts/arm64
+
+      - name: Create Release and upload assets
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.build-image.outputs.version }}
+          files: |
+            artifacts/amd64/*
+            artifacts/arm64/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

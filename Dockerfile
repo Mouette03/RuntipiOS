@@ -17,6 +17,16 @@ RUN apt-get update && apt-get install -y \
     git \
     python3 \
     python3-yaml \
+    # Tools for building ARM images
+    qemu-user-static \
+    binfmt-support \
+    kpartx \
+    parted \
+    e2fsprogs \
+    dosfstools \
+    kmod \
+    util-linux \
+    grub-efi-arm64 \
     && rm -rf /var/lib/apt/lists/*
 
 # Create working directory

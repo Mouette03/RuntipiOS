@@ -1,0 +1,64 @@
+# Fichiers à ignorer
+
+# Sorties de build
+output/
+work/
+mount/
+*.img
+*.img.xz
+*.img.gz
+*.img.zip
+
+# Fichiers temporaires
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Secrets
+.env
+*.key
+*.pem
+*.crt
+secrets/
+
+# Docker
+.docker/
+
+# Autre
+*.bak
+*.old

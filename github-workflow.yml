@@ -1,0 +1,309 @@
+name: Build and Release RuntipiOS
+
+on:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag for the release'
+        required: false
+        default: 'dev'
+      skip_cache:
+        description: 'Skip build cache'
+        type: boolean
+        required: false
+        default: false
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build-image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      config_hash: ${{ steps.config.outputs.hash }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION_RAW="${{ github.event.inputs.version }}"
+          elif [ "${{ github.event_name }}" = "release" ]; then
+            VERSION_RAW="${{ github.event.release.tag_name }}"
+          else
+            if echo "$GITHUB_REF" | grep -q "^refs/tags/"; then
+              VERSION_RAW=${GITHUB_REF#refs/tags/}
+            elif echo "$GITHUB_REF" | grep -q "^refs/heads/"; then
+              VERSION_RAW="dev-$(date +%Y%m%d-%H%M%S)"
+            else
+              VERSION_RAW="dev-$(date +%Y%m%d)"
+            fi
+          fi
+          
+          VERSION=${VERSION_RAW#v}
+          SANITIZED=$(echo "$VERSION" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_.-]/-/g')
+          SANITIZED=$(echo "$SANITIZED" | sed 's/^-*//;s/-*$//')
+          
+          echo "version=$SANITIZED" >> $GITHUB_OUTPUT
+          echo "version_raw=$VERSION_RAW" >> $GITHUB_OUTPUT
+          echo "🏗️ Building version: ${SANITIZED} (raw: ${VERSION_RAW})"
+
+      - name: Read and validate config
+        id: config
+        run: |
+          if [ ! -f config.yml ]; then
+            echo "❌ config.yml not found!"
+            exit 1
+          fi
+          
+          CONFIG_HASH=$(sha256sum config.yml | cut -d' ' -f1 | cut -c1-8)
+          echo "hash=$CONFIG_HASH" >> $GITHUB_OUTPUT
+          echo "📝 Config hash: $CONFIG_HASH"
+          
+          echo "📋 Configuration:"
+          cat config.yml
+
+      - name: Free up disk space
+        run: |
+          echo "🧹 Cleaning up disk space..."
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune -a -f
+          df -h
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64,arm
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push builder image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/runtipios-builder:${{ steps.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/runtipios-builder:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+            VERSION=${{ steps.version.outputs.version }}
+
+  build-rpi-image:
+    needs: build-image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Free up disk space
+        run: |
+          echo "🧹 Cleaning up disk space..."
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          df -h
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare output directory
+        run: |
+          mkdir -p output
+          chmod 777 output
+
+      - name: Pull builder image
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ github.repository_owner }}/runtipios-builder:${{ needs.build-image.outputs.version }}"
+          echo "📥 Pulling builder image: $IMAGE"
+          docker pull $IMAGE
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+
+      - name: Build Raspberry Pi image
+        run: |
+          echo "🔨 Building Raspberry Pi OS image..."
+          echo "Version: ${{ needs.build-image.outputs.version }}"
+          echo "Config hash: ${{ needs.build-image.outputs.config_hash }}"
+          
+          OUTPUT_NAME="RuntipiOS-${{ needs.build-image.outputs.version }}-arm64"
+          echo "OUTPUT_NAME=$OUTPUT_NAME" >> $GITHUB_ENV
+          
+          docker run --rm --privileged \
+            -e VERSION="${{ needs.build-image.outputs.version }}" \
+            -e OUTPUT_NAME="$OUTPUT_NAME" \
+            -v $(pwd)/config.yml:/build/config.yml:ro \
+            -v $(pwd)/output:/build/output \
+            -v $(pwd)/scripts:/build/scripts:ro \
+            ${{ env.IMAGE }} \
+            /bin/bash -c "/build/scripts/build-image.sh"
+
+      - name: Verify image creation
+        run: |
+          echo "📦 Checking output directory:"
+          ls -lh output/
+          
+          if ls output/*.img* 1> /dev/null 2>&1; then
+            echo "✅ Image file(s) found!"
+            for img in output/*.img*; do
+              echo "  - $(basename $img): $(du -h $img | cut -f1)"
+            done
+          else
+            echo "❌ ERROR: No image file found!"
+            exit 1
+          fi
+
+      - name: Generate checksums
+        run: |
+          cd output
+          echo "🔐 Generating checksums..."
+          sha256sum * > SHA256SUMS
+          echo "Checksums:"
+          cat SHA256SUMS
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtipios-${{ needs.build-image.outputs.version }}
+          path: output/*
+          retention-days: 30
+          if-no-files-found: error
+          compression-level: 0
+
+  create-release:
+    needs: [build-image, build-rpi-image]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && needs.build-image.outputs.version != 'dev')
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: runtipios-${{ needs.build-image.outputs.version }}
+          path: artifacts/
+
+      - name: Verify downloaded artifacts
+        run: |
+          echo "📋 Downloaded artifacts:"
+          ls -lh artifacts/
+          
+          cd artifacts
+          if [ -f SHA256SUMS ]; then
+            echo "🔐 Verifying checksums..."
+            sha256sum -c SHA256SUMS
+          fi
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          cat > release_notes.md << 'EOF'
+          ## 🚀 RuntipiOS ${{ needs.build-image.outputs.version }}
+          
+          Image Raspberry Pi OS optimisée pour Runtipi avec configuration WiFi automatique via smartphone.
+          
+          ### 📦 Contenu
+          
+          - **Base**: Raspberry Pi OS Lite (ARM64)
+          - **Runtipi**: Installation automatique au premier démarrage
+          - **WiFi-Connect**: Configuration réseau via portail captif
+          - **Services**: Docker, Avahi (mDNS), SSH
+          
+          ### 🔧 Installation
+          
+          1. **Téléchargez** le fichier `.img.xz` depuis les assets ci-dessous
+          2. **Flashez** sur une carte microSD (minimum 8 Go) avec [Raspberry Pi Imager](https://www.raspberrypi.com/software/) ou Etcher
+          3. **Insérez** la carte SD dans votre Raspberry Pi et démarrez
+          4. **Connectez-vous** au WiFi "RuntipiOS-Setup" avec votre smartphone
+          5. **Configurez** votre réseau via le portail captif qui s'ouvre automatiquement
+          6. **Attendez** l'installation de Runtipi (environ 10-15 minutes)
+          7. **Accédez** à Runtipi sur `http://runtipios.local` ou l'IP affichée
+          
+          ### 🔐 Identifiants par défaut
+          
+          - **Utilisateur**: `runtipi`
+          - **Mot de passe**: `runtipi`
+          - **SSH**: Activé (port 22)
+          
+          ⚠️ **Important**: Changez le mot de passe après la première connexion !
+          
+          ### 🌐 Accès
+          
+          Après configuration :
+          - **Runtipi**: `http://runtipios.local` ou `http://<IP>:80`
+          - **SSH**: `ssh runtipi@runtipios.local`
+          - **Page de statut**: `http://runtipios.local:8080`
+          
+          ### 📝 Configuration
+          
+          Le fichier `config.yml` utilisé pour cette build est disponible dans le repository.
+          Vous pouvez le modifier et rebuilder pour personnaliser votre image.
+          
+          ### 🐛 Problèmes connus
+          
+          - Le premier démarrage peut prendre 2-3 minutes
+          - L'installation de Runtipi nécessite une connexion Internet
+          - Le portail captif peut ne pas s'afficher automatiquement sur certains Android : ouvrez manuellement un navigateur
+          
+          ### 📊 Checksums
+          
+          Voir le fichier `SHA256SUMS` pour vérifier l'intégrité de l'image.
+          
+          ### 🙏 Remerciements
+          
+          - [Runtipi](https://runtipi.io/) - Le serveur personnel
+          - [Balena WiFi-Connect](https://github.com/balena-os/wifi-connect) - Portail captif
+          - [Raspberry Pi Foundation](https://www.raspberrypi.org/) - Raspberry Pi OS
+          EOF
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.build-image.outputs.version }}
+          name: RuntipiOS v${{ needs.build-image.outputs.version }}
+          body_path: release_notes.md
+          files: artifacts/*
+          draft: false
+          prerelease: ${{ contains(needs.build-image.outputs.version, 'dev') || contains(needs.build-image.outputs.version, 'alpha') || contains(needs.build-image.outputs.version, 'beta') }}
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

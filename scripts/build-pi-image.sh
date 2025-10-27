@@ -76,11 +76,21 @@ debootstrap --arch=arm64 --foreign ${RELEASE} "$MNT_ROOT" http://deb.debian.org/
 cp /usr/bin/qemu-aarch64-static "$MNT_ROOT/usr/bin/"
 chroot "$MNT_ROOT" /usr/bin/qemu-aarch64-static /debootstrap/debootstrap --second-stage || true
 
+
 mount --bind /proc "$MNT_ROOT/proc"
 mount --bind /sys "$MNT_ROOT/sys"
 mount --bind /dev "$MNT_ROOT/dev"
 
-chroot "$MNT_ROOT" /usr/bin/qemu-aarch64-static /bin/bash -lc "export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get install -y --no-install-recommends linux-image-arm64 ssh network-manager python3 python3-pip python3-yaml || true"
+# Installer le kernel arm64 et vérifier
+echo "==> Installing linux-image-arm64 in chroot"
+chroot "$MNT_ROOT" /usr/bin/qemu-aarch64-static /bin/bash -lc "export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get install -y linux-image-arm64 ssh network-manager python3 python3-pip python3-yaml"
+echo "==> Kernel files in /boot:"
+ls -l "$MNT_ROOT/boot"
+KERNEL_ARM64=$(ls "$MNT_ROOT/boot" | grep 'vmlinuz-' | grep -v 'amd64' | head -1)
+if [ -z "$KERNEL_ARM64" ]; then
+  echo "ERROR: No arm64 kernel found in /boot."
+  exit 1
+fi
 
 # Fetch Raspberry Pi firmware and copy boot files
 TEMP_FW=$(mktemp -d)

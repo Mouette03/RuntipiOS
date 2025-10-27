@@ -69,8 +69,8 @@ jobs:
           load: ${{ !startsWith(github.ref, 'refs/tags/') }}
           tags: |
             runtipios-builder:latest
-            ${{ env.REGISTRY }}/${{ github.repository }}:build-${{ steps.version.outputs.version }}
-            ${{ env.REGISTRY }}/${{ github.repository }}:v${{ steps.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ toLower(github.repository) }}:build-${{ steps.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ toLower(github.repository) }}:v${{ steps.version.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -82,10 +82,13 @@ jobs:
           set -e
           OWNER=${{ github.repository_owner }}
           PACKAGE=${{ github.event.repository.name }}
-          echo "Attempting to set package visibility for ${PACKAGE} under ${OWNER} to public"
+          # Convert owner and package to lowercase for API paths
+          OWNER_LC=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
+          PACKAGE_LC=$(echo "$PACKAGE" | tr '[:upper:]' '[:lower:]')
+          echo "Attempting to set package visibility for ${PACKAGE_LC} under ${OWNER_LC} to public"
           # Try organization endpoint first
-          ORG_URL="https://api.github.com/orgs/${OWNER}/packages/container/${PACKAGE}/visibility"
-          USER_URL="https://api.github.com/user/packages/container/${PACKAGE}/visibility"
+          ORG_URL="https://api.github.com/orgs/${OWNER_LC}/packages/container/${PACKAGE_LC}/visibility"
+          USER_URL="https://api.github.com/user/packages/container/${PACKAGE_LC}/visibility"
 
           echo "Trying org endpoint: $ORG_URL"
           CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PUT -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GHCR_TOKEN}" $ORG_URL -d '{"visibility":"public"}')

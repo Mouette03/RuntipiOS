@@ -8,6 +8,10 @@ set -euo pipefail
 BUILD_DIR="/build"
 OUTPUT_DIR="${BUILD_DIR}/output"
 CHROOT_DIR="${BUILD_DIR}/chroot-pi"
+
+# Load build variables from config
+eval $(python3 /build/scripts/parse-config.py)
+
 IMG_SIZE="4G"
 IMG_NAME="${OUTPUT_DIR}/RuntipiOS-${ISO_VERSION:-1.0.0}-raspberry.img"
 FIRMWARE_REPO="https://github.com/raspberrypi/firmware.git"

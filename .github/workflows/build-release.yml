@@ -58,7 +58,12 @@ jobs:
           
       - name: Update version in build config
         run: |
-          sed -i "s/version: .*/version: ${{ steps.version.outputs.version }}/" build-config.yml
+          # Safely update version in build-config.yml. Escape any '/' or '&' characters
+          # in the replacement string so sed's substitute doesn't break when the
+          # version contains slashes or other special chars.
+          VER="${{ steps.version.outputs.version }}"
+          ESCAPED_VER=$(printf '%s' "$VER" | sed 's/[\/&]/\\&/g')
+          sed -i "s/version: .*/version: $ESCAPED_VER/" build-config.yml
 
       - name: Sanitize repository name for tags
         id: repo

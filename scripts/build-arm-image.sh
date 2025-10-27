@@ -7,6 +7,10 @@ set -euo pipefail
 BUILD_DIR="/build"
 OUTPUT_DIR="${BUILD_DIR}/output"
 CHROOT_DIR="${BUILD_DIR}/chroot-arm"
+
+# Load build variables from config
+eval $(python3 /build/scripts/parse-config.py)
+
 IMG_SIZE="4G"  # default size, can be overridden by env IMAGE_SIZE
 IMG_NAME="${OUTPUT_DIR}/RuntipiOS-${ISO_VERSION:-1.0.0}-arm64.img"
 

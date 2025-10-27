@@ -21,8 +21,10 @@ RUN apt-get update && apt-get install -y \
 
 RUN mkdir -p /build/scripts /build/stages /build/output /build/work /build/mount
 
+# Copier les scripts ET forcer les permissions en une seule couche
 COPY scripts/ /build/scripts/
-RUN chmod +x /build/scripts/*.sh
+RUN find /build/scripts -name "*.sh" -exec chmod +x {} \; && \
+    ls -la /build/scripts/
 
 WORKDIR /build
 

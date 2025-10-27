@@ -21,7 +21,9 @@ source /tmp/build-vars.sh
 
 # Bootstrap the base system
 echo "==> Bootstrapping Debian base system..."
-debootstrap --arch="${ARCH}" "${RELEASE}" "${CHROOT_DIR}" http://deb.debian.org/debian/
+# Include python3 and pip in the debootstrap so scripts executed inside the chroot
+# can use python3/pip without requiring extra network installs later.
+debootstrap --include=python3,python3-pip,python3-yaml --arch="${ARCH}" "${RELEASE}" "${CHROOT_DIR}" http://deb.debian.org/debian/
 
 # Configure the chroot environment
 echo "==> Configuring chroot environment..."

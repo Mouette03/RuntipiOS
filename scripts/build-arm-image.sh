@@ -24,15 +24,38 @@ parted -s "$IMG_NAME" set 1 boot on
 # Attach loop device
 LOOP=$(losetup --show -fP "$IMG_NAME")
 echo "Loop device: $LOOP"
-# Wait for partitions to appear
+# Wait a moment for the kernel to create partition devices
 sleep 1
-EFI_DEV=${LOOP}p1
-ROOT_DEV=${LOOP}p2
+LOOP_BS=$(basename "$LOOP")
+KPARTX_ADDED=0
 
-if [ ! -b "$EFI_DEV" ]; then
-  # some systems name partitions as ${LOOP}p1, others as ${LOOP}1
+# Prefer ${loop}p1 naming, fallback to ${loop}1, then try kpartx mapping
+if [ -b "${LOOP}p1" ]; then
+  EFI_DEV=${LOOP}p1
+  ROOT_DEV=${LOOP}p2
+elif [ -b "${LOOP}1" ]; then
   EFI_DEV=${LOOP}1
   ROOT_DEV=${LOOP}2
+else
+  echo "Partition devices not present, trying kpartx to map partitions"
+  kpartx -av "$LOOP"
+  KPARTX_ADDED=1
+  # mapper devices look like /dev/mapper/loop0p1
+  if [ -b "/dev/mapper/${LOOP_BS}p1" ]; then
+    EFI_DEV="/dev/mapper/${LOOP_BS}p1"
+    ROOT_DEV="/dev/mapper/${LOOP_BS}p2"
+  else
+    # give a short wait and re-check
+    sleep 1
+    if [ -b "/dev/mapper/${LOOP_BS}p1" ]; then
+      EFI_DEV="/dev/mapper/${LOOP_BS}p1"
+      ROOT_DEV="/dev/mapper/${LOOP_BS}p2"
+    else
+      echo "ERROR: cannot find partition devices for $LOOP"
+      losetup -d "$LOOP" || true
+      exit 1
+    fi
+  fi
 fi
 
 echo "EFI_DEV=$EFI_DEV, ROOT_DEV=$ROOT_DEV"
@@ -44,7 +67,7 @@ mkfs.ext4 -F "$ROOT_DEV"
 MNT_EFI=$(mktemp -d)
 MNT_ROOT=$(mktemp -d)
 
-trap 'echo "Cleaning..."; umount "$MNT_EFI" 2>/dev/null || true; umount "$MNT_ROOT" 2>/dev/null || true; losetup -d "$LOOP" 2>/dev/null || true; rm -rf "$MNT_EFI" "$MNT_ROOT"' EXIT
+trap 'echo "Cleaning..."; umount "$MNT_EFI" 2>/dev/null || true; umount "$MNT_ROOT" 2>/dev/null || true; if [ "$KPARTX_ADDED" -eq 1 ]; then kpartx -d "$LOOP" 2>/dev/null || true; fi; losetup -d "$LOOP" 2>/dev/null || true; rm -rf "$MNT_EFI" "$MNT_ROOT"' EXIT
 
 mount "$ROOT_DEV" "$MNT_ROOT"
 mount "$EFI_DEV" "$MNT_EFI"

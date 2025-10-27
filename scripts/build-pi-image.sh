@@ -25,11 +25,34 @@ parted -s "$IMG_NAME" mkpart primary ext4 256MiB 100%
 LOOP=$(losetup --show -fP "$IMG_NAME")
 echo "Loop device: $LOOP"
 sleep 1
-BOOT_DEV=${LOOP}p1
-ROOT_DEV=${LOOP}p2
-if [ ! -b "$BOOT_DEV" ]; then
+LOOP_BS=$(basename "$LOOP")
+KPARTX_ADDED=0
+
+# Determine partition device names robustly
+if [ -b "${LOOP}p1" ]; then
+  BOOT_DEV=${LOOP}p1
+  ROOT_DEV=${LOOP}p2
+elif [ -b "${LOOP}1" ]; then
   BOOT_DEV=${LOOP}1
   ROOT_DEV=${LOOP}2
+else
+  echo "Partition devices not present, trying kpartx to map partitions"
+  kpartx -av "$LOOP"
+  KPARTX_ADDED=1
+  if [ -b "/dev/mapper/${LOOP_BS}p1" ]; then
+    BOOT_DEV="/dev/mapper/${LOOP_BS}p1"
+    ROOT_DEV="/dev/mapper/${LOOP_BS}p2"
+  else
+    sleep 1
+    if [ -b "/dev/mapper/${LOOP_BS}p1" ]; then
+      BOOT_DEV="/dev/mapper/${LOOP_BS}p1"
+      ROOT_DEV="/dev/mapper/${LOOP_BS}p2"
+    else
+      echo "ERROR: cannot find partition devices for $LOOP"
+      losetup -d "$LOOP" || true
+      exit 1
+    fi
+  fi
 fi
 
 echo "Creating filesystems"
@@ -39,6 +62,7 @@ mkfs.ext4 -F "$ROOT_DEV"
 MNT_BOOT=$(mktemp -d)
 MNT_ROOT=$(mktemp -d)
 trap 'echo "Cleaning..."; umount "$MNT_BOOT" 2>/dev/null || true; umount "$MNT_ROOT" 2>/dev/null || true; losetup -d "$LOOP" 2>/dev/null || true; rm -rf "$MNT_BOOT" "$MNT_ROOT"' EXIT
+trap 'echo "Cleaning..."; umount "$MNT_BOOT" 2>/dev/null || true; umount "$MNT_ROOT" 2>/dev/null || true; if [ "$KPARTX_ADDED" -eq 1 ]; then kpartx -d "$LOOP" 2>/dev/null || true; fi; losetup -d "$LOOP" 2>/dev/null || true; rm -rf "$MNT_BOOT" "$MNT_ROOT"' EXIT
 
 mount "$ROOT_DEV" "$MNT_ROOT"
 mount "$BOOT_DEV" "$MNT_BOOT"

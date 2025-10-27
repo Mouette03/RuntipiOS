@@ -41,20 +41,35 @@ jobs:
       - name: Extract version
         id: version
         run: |
-          # Get the raw version from either the workflow_dispatch input or the tag
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          # Determine a safe version string to use for image tags and release names.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             VERSION_RAW="${{ github.event.inputs.version }}"
           else
-            # remove refs/tags/ prefix
-            VERSION_RAW=${GITHUB_REF#refs/tags/}
+            # If this was triggered by a tag, strip the refs/tags/ prefix
+            if echo "$GITHUB_REF" | grep -q "^refs/tags/"; then
+              VERSION_RAW=${GITHUB_REF#refs/tags/}
+            elif echo "$GITHUB_REF" | grep -q "^refs/heads/"; then
+              # For branch pushes, use the branch name (not the full ref)
+              VERSION_RAW=${GITHUB_REF#refs/heads/}
+            else
+              VERSION_RAW=$GITHUB_REF
+            fi
           fi
-          # Strip any leading 'v' or 'V' and convert to lowercase to form a safe tag
+
+          # Strip any leading 'v' or 'V'
           VERSION=${VERSION_RAW#v}
           VERSION=${VERSION#V}
-          SANITIZED_VERSION=$(echo "$VERSION" | tr '[:upper:]' '[:lower:]')
-          echo "version=${SANITIZED_VERSION}" >> $GITHUB_OUTPUT
-          echo "version_raw=$VERSION_RAW" >> $GITHUB_OUTPUT
-          echo "Building version: ${SANITIZED_VERSION} (raw: ${VERSION_RAW})"
+
+          # Convert to lowercase and replace any characters not allowed in a Docker tag
+          # (allowed: [A-Za-z0-9_.-]) -> convert others to '-'
+          SANITIZED=$(echo "$VERSION" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_.-]/-/g')
+
+          # Trim leading/trailing hyphens
+          SANITIZED=$(echo "$SANITIZED" | sed 's/^-*//;s/-*$//')
+
+          echo "version=${SANITIZED}" >> $GITHUB_OUTPUT
+          echo "version_raw=${VERSION_RAW}" >> $GITHUB_OUTPUT
+          echo "Building version: ${SANITIZED} (raw: ${VERSION_RAW})"
           
       - name: Update version in build config
         run: |

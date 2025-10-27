@@ -3,14 +3,14 @@
 
 # Version de Raspberry Pi OS à utiliser
 raspios:
-  version: "2024-11-19"  # Format: YYYY-MM-DD (voir https://downloads.raspberrypi.com/raspios_lite_arm64/images/)
+  version: "2025-10-01"  # Dernière version stable (Trixie)
   variant: "lite"         # Options: lite, desktop, full
   arch: "arm64"           # Options: arm64, armhf
-  url: "https://downloads.raspberrypi.com/raspios_lite_arm64/images/raspios_lite_arm64-2024-11-19/2024-11-19-raspios-bookworm-arm64-lite.img.xz"
+  url: "https://downloads.raspberrypi.com/raspios_lite_arm64/images/raspios_lite_arm64-2025-10-01/2025-10-01-raspios-trixie-arm64-lite.img.xz"
 
 # Version de Runtipi
 runtipi:
-  version: "v3.8.0"       # Version de Runtipi à installer (voir https://github.com/runtipi/runtipi/releases)
+  version: "v4.5.3"       # Version de Runtipi à installer (voir https://github.com/runtipi/runtipi/releases)
   auto_install: true      # Installer automatiquement au premier démarrage
   install_timeout: 1800   # Timeout d'installation en secondes (30 min)
   repo_url: "https://github.com/runtipi/runtipi.git"
@@ -32,9 +32,10 @@ system:
   locale: "fr_FR.UTF-8"
   keyboard_layout: "fr"
   
-  # Utilisateur par défaut
+  # Utilisateur par défaut (sera remplacé par la config du portail captif)
+  # Ces valeurs ne sont utilisées QUE si le portail captif n'est pas utilisé
   default_user: "runtipi"
-  default_password: "runtipi"  # CHANGEZ CECI en production !
+  default_password: "runtipi"  # SERA REMPLACÉ lors de la configuration via portail
   
   # SSH
   enable_ssh: true
@@ -67,9 +68,10 @@ services:
   enable_avahi: true
   
   # Docker (requis pour Runtipi)
+  # NOTE: Runtipi installe automatiquement Docker et Docker Compose
+  # Ces paramètres sont pour référence uniquement
   docker:
     version: "latest"
-    compose_version: "v2.24.5"
   
   # Page de statut web
   status_page:
@@ -106,6 +108,7 @@ packages:
     - avahi-utils
     - network-manager
     - dnsmasq
+    - jq  # Requis pour le backend wifi-connect
   
   # Packages à supprimer pour gagner de l'espace
   remove:
@@ -114,8 +117,8 @@ packages:
 
 # Métadonnées
 metadata:
-  project_name: "RuntipiOS"
+  project_name: "RuntiPIos"
   project_url: "https://github.com/votre-username/runtipios"
-  description: "Système Raspberry Pi OS optimisé pour Runtipi avec configuration WiFi automatique"
-  author: "Votre Nom"
+  description: "Système Raspberry Pi OS optimisé pour Runtipi avec configuration WiFi automatique et portail captif multilingue"
+  author: "mouette03"
   license: "MIT"

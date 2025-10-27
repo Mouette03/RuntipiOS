@@ -31,6 +31,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       config_hash: ${{ steps.config.outputs.hash }}
+      repo_lower: ${{ steps.repo.outputs.repo_lower }}
     
     steps:
       - name: Checkout repository
@@ -60,6 +61,14 @@ jobs:
           echo "version=$SANITIZED" >> $GITHUB_OUTPUT
           echo "version_raw=$VERSION_RAW" >> $GITHUB_OUTPUT
           echo "🏗️ Building version: ${SANITIZED} (raw: ${VERSION_RAW})"
+
+      - name: Sanitize repository name
+        id: repo
+        run: |
+          # Convertir le nom du repository en minuscules
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "repo_lower=$REPO_LOWER" >> $GITHUB_OUTPUT
+          echo "Repository (lowercase): $REPO_LOWER"
 
       - name: Read and validate config
         id: config
@@ -108,8 +117,8 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/runtipios-builder:${{ steps.version.outputs.version }}
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/runtipios-builder:latest
+            ${{ env.REGISTRY }}/${{ steps.repo.outputs.repo_lower }}:${{ steps.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ steps.repo.outputs.repo_lower }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
@@ -150,7 +159,7 @@ jobs:
 
       - name: Pull builder image
         run: |
-          IMAGE="${{ env.REGISTRY }}/${{ github.repository_owner }}/runtipios-builder:${{ needs.build-image.outputs.version }}"
+          IMAGE="${{ env.REGISTRY }}/${{ needs.build-image.outputs.repo_lower }}:${{ needs.build-image.outputs.version }}"
           echo "📥 Pulling builder image: $IMAGE"
           docker pull $IMAGE
           echo "IMAGE=$IMAGE" >> $GITHUB_ENV
@@ -245,7 +254,7 @@ jobs:
           
           - **Base**: Raspberry Pi OS Lite (ARM64)
           - **Runtipi**: Installation automatique au premier démarrage
-          - **WiFi-Connect**: Configuration réseau via portail captif
+          - **WiFi-Connect**: Configuration réseau via portail captif multilingue (FR/EN)
           - **Services**: Docker, Avahi (mDNS), SSH
           
           ### 🔧 Installation
@@ -254,23 +263,27 @@ jobs:
           2. **Flashez** sur une carte microSD (minimum 8 Go) avec [Raspberry Pi Imager](https://www.raspberrypi.com/software/) ou Etcher
           3. **Insérez** la carte SD dans votre Raspberry Pi et démarrez
           4. **Connectez-vous** au WiFi "RuntipiOS-Setup" avec votre smartphone
-          5. **Configurez** votre réseau via le portail captif qui s'ouvre automatiquement
+          5. **Configurez** :
+             - Nom d'utilisateur SSH
+             - Mot de passe SSH
+             - Réseau WiFi et mot de passe
           6. **Attendez** l'installation de Runtipi (environ 10-15 minutes)
-          7. **Accédez** à Runtipi sur `http://runtipios.local` ou l'IP affichée
+          7. **Accédez** à Runtipi sur `http://runtipios.local`
           
-          ### 🔐 Identifiants par défaut
+          ### 🌍 Langues Supportées
           
-          - **Utilisateur**: `runtipi`
-          - **Mot de passe**: `runtipi`
-          - **SSH**: Activé (port 22)
+          - 🇬🇧 English
+          - 🇫🇷 Français
           
-          ⚠️ **Important**: Changez le mot de passe après la première connexion !
+          ### 🔐 Configuration SSH
+          
+          Vous définissez votre propre utilisateur et mot de passe lors de la première configuration.
           
           ### 🌐 Accès
           
           Après configuration :
           - **Runtipi**: `http://runtipios.local` ou `http://<IP>:80`
-          - **SSH**: `ssh runtipi@runtipios.local`
+          - **SSH**: `ssh votre-utilisateur@runtipios.local`
           - **Page de statut**: `http://runtipios.local:8080`
           
           ### 📝 Configuration

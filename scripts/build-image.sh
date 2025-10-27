@@ -171,21 +171,30 @@ else
     KPARTX_OUTPUT=$(kpartx -av "$BASE_IMAGE")
     sleep 3
     
-    # Extraire SEULEMENT les lignes "add map" pour éviter les faux positifs
-    BOOT_MAPPER=$(echo "$KPARTX_OUTPUT" | grep "^add map" | grep "p1" | awk '{print $3}')
-    ROOT_MAPPER=$(echo "$KPARTX_OUTPUT" | grep "^add map" | grep "p2" | awk '{print $3}')
+    # Utiliser awk avec exit pour n'extraire QUE la première ligne qui match
+    BOOT_MAPPER=$(echo "$KPARTX_OUTPUT" | awk '/^add map.*p1 / {print $3; exit}')
+    ROOT_MAPPER=$(echo "$KPARTX_OUTPUT" | awk '/^add map.*p2 / {print $3; exit}')
+    
+    # Vérifier que les variables ne sont pas vides
+    if [ -z "$BOOT_MAPPER" ] || [ -z "$ROOT_MAPPER" ]; then
+        log_error "Impossible d'extraire les noms des mappers depuis kpartx"
+        log_info "Output kpartx complet:"
+        echo "$KPARTX_OUTPUT"
+        exit 1
+    fi
     
     BOOT_PART="/dev/mapper/${BOOT_MAPPER}"
     ROOT_PART="/dev/mapper/${ROOT_MAPPER}"
     USE_KPARTX=1
     
     log_info "Devices kpartx créés:"
-    log_info "  Boot mapper: ${BOOT_MAPPER}"
-    log_info "  Root mapper: ${ROOT_MAPPER}"
+    log_info "  Boot: ${BOOT_MAPPER} -> ${BOOT_PART}"
+    log_info "  Root: ${ROOT_MAPPER} -> ${ROOT_PART}"
 fi
 
-log_info "Boot partition: $BOOT_PART"
-log_info "Root partition: $ROOT_PART"
+log_info "Vérification des partitions..."
+log_info "  Boot partition: $BOOT_PART"
+log_info "  Root partition: $ROOT_PART"
 
 # Vérifier que les partitions existent
 if [ ! -e "$BOOT_PART" ]; then

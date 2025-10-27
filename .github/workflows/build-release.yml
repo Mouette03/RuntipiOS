@@ -39,13 +39,20 @@ jobs:
       - name: Extract version
         id: version
         run: |
+          # Get the raw version from either the workflow_dispatch input or the tag
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            VERSION="${{ github.event.inputs.version }}"
+            VERSION_RAW="${{ github.event.inputs.version }}"
           else
-            VERSION=${GITHUB_REF#refs/tags/v}
+            # remove refs/tags/ prefix
+            VERSION_RAW=${GITHUB_REF#refs/tags/}
           fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Building version: $VERSION"
+          # Strip any leading 'v' or 'V' and convert to lowercase to form a safe tag
+          VERSION=${VERSION_RAW#v}
+          VERSION=${VERSION#V}
+          SANITIZED_VERSION=$(echo "$VERSION" | tr '[:upper:]' '[:lower:]')
+          echo "version=${SANITIZED_VERSION}" >> $GITHUB_OUTPUT
+          echo "version_raw=$VERSION_RAW" >> $GITHUB_OUTPUT
+          echo "Building version: ${SANITIZED_VERSION} (raw: ${VERSION_RAW})"
           
       - name: Update version in build config
         run: |

@@ -82,12 +82,10 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  build-iso:
+
+  build-pi:
     needs: build-image
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [amd64, arm64]
     permissions:
       contents: write
       packages: write
@@ -112,29 +110,15 @@ jobs:
           docker pull $IMAGE || true
           echo "IMAGE=$IMAGE" >> $GITHUB_ENV
 
-      - name: Run builder for ${{ matrix.arch }}
+      - name: Build Raspberry Pi image
         run: |
           IMAGE=${IMAGE}
           mkdir -p output
-          if [ "${{ matrix.arch }}" = "amd64" ]; then
-            echo "Running build-iso.sh for amd64"
-            docker run --rm --privileged \
-              -e ARCH=amd64 \
-              -v $(pwd)/output:/build/output \
-              $IMAGE /bin/bash -lc "/build/scripts/build-iso.sh"
-          else
-            echo "Running build-arm-image.sh (generic arm64 image)"
-            docker run --rm --privileged \
-              -e ARCH=arm64 \
-              -v $(pwd)/output:/build/output \
-              $IMAGE /bin/bash -lc "/build/scripts/build-arm-image.sh"
-
-            echo "Running build-pi-image.sh (Raspberry-style image)"
-            docker run --rm --privileged \
-              -e ARCH=arm64 \
-              -v $(pwd)/output:/build/output \
-              $IMAGE /bin/bash -lc "/build/scripts/build-pi-image.sh"
-          fi
+          echo "Running build-pi-image.sh (Raspberry Pi arm64 image)"
+          docker run --rm --privileged \
+            -e ARCH=arm64 \
+            -v $(pwd)/output:/build/output \
+            $IMAGE /bin/bash -lc "/build/scripts/build-pi-image.sh"
 
       - name: Generate checksums
         run: |
@@ -145,13 +129,13 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: runtipios-${{ matrix.arch }}-${{ needs.build-image.outputs.version }}
+          name: runtipios-pi-${{ needs.build-image.outputs.version }}
           path: |
             output/*
           retention-days: 30
 
   create-release:
-    needs: build-iso
+    needs: build-pi
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && needs.build-image.outputs.version != 'dev')
     permissions:
@@ -160,25 +144,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Download amd64 artifact
-        uses: actions/download-artifact@v3
-        with:
-          name: runtipios-amd64-${{ needs.build-image.outputs.version }}
-          path: artifacts/amd64
 
-      - name: Download arm64 artifact
+      - name: Download Pi artifact
         uses: actions/download-artifact@v3
         with:
-          name: runtipios-arm64-${{ needs.build-image.outputs.version }}
-          path: artifacts/arm64
+          name: runtipios-pi-${{ needs.build-image.outputs.version }}
+          path: artifacts/pi
 
       - name: Create Release and upload assets
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ needs.build-image.outputs.version }}
           files: |
-            artifacts/amd64/*
-            artifacts/arm64/*
+            artifacts/pi/*
           draft: false
           prerelease: false
         env:

@@ -18,46 +18,47 @@ A lightweight Debian-based operating system with automatic Runtipi installation 
 
 ## Quick Start
 
-### Building the ISO
 
-#### Using the build script (recommended):
+### Construction de l'image Raspberry Pi (arm64)
+
+#### Avec le script de build (recommandé) :
 ```bash
 chmod +x build.sh
 ./build.sh
 ```
 
-#### Manual Docker build:
+#### Build Docker manuel :
 ```bash
 docker build -t runtipios-builder:latest .
-docker run --rm --privileged -v $(pwd)/output:/build/output runtipios-builder:latest
+docker run --rm --privileged -v $(pwd)/output:/build/output runtipios-builder:latest /bin/bash -lc "/build/scripts/build-pi-image.sh"
 ```
 
-The ISO file will be created in the `output/` directory.
+L'image Pi sera créée dans le dossier `output/`.
 
-### Installing RuntipiOS
+### Installation sur Raspberry Pi
 
-1. Download or build the ISO file
-2. Write the ISO to a USB drive:
-   ```bash
-   sudo dd if=output/RuntipiOS-*.iso of=/dev/sdX bs=4M status=progress && sync
-   ```
-   Replace `/dev/sdX` with your USB drive (e.g., `/dev/sdb`)
+1. Téléchargez ou construisez l'image Pi
+2. Écrivez l'image sur une carte SD :
+  ```bash
+  sudo dd if=output/RuntipiOS-*.img of=/dev/sdX bs=4M status=progress && sync
+  ```
+  Remplacez `/dev/sdX` par votre carte SD (ex : `/dev/sdb`)
 
-3. Boot from the USB drive
-4. The system will automatically:
-   - Detect network connectivity
-   - If no network is found, start a WiFi captive portal
-   - Connect to WiFi network "RuntipiOS-Setup"
-   - Open a web browser to http://192.168.42.1
-   - Configure WiFi credentials and SSH user through the web interface
-   - Automatically install and configure Runtipi
+3. Insérez la carte SD dans le Raspberry Pi et démarrez
+4. Le système :
+  - Détecte la connectivité réseau
+  - Si aucun réseau, démarre le portail WiFi
+  - Connectez-vous au WiFi "RuntipiOS-Setup"
+  - Ouvrez un navigateur sur http://192.168.42.1
+  - Configurez le WiFi et l'utilisateur SSH via l'interface web
+  - Installe et configure automatiquement Runtipi
 
-5. The system will automatically install Runtipi and display the connection address
+5. L'adresse de connexion Runtipi s'affichera à la fin
 
-### Accessing Runtipi
+### Accès à Runtipi
 
-After installation, Runtipi will be accessible at:
-- `http://<your-ip-address>`
+Après installation, Runtipi est accessible à :
+- `http://<adresse-ip-local>`
 - `http://localhost` (if accessing from the machine itself)
 
 You can also SSH into the system using the credentials you configured.

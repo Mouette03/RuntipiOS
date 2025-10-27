@@ -55,11 +55,47 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: false
-          load: true
-          tags: runtipios-builder:latest
+          # Push the built image to the registry when building for a tag, otherwise
+          # load it into the runner for local use. This avoids unnecessary pushes
+          # on PRs or manual runs.
+          push: ${{ startsWith(github.ref, 'refs/tags/') }}
+          load: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          tags: |
+            runtipios-builder:latest
+            ${{ env.REGISTRY }}/${{ github.repository }}:build-${{ steps.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ github.repository }}:v${{ steps.version.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Make GHCR package public
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        run: |
+          set -e
+          OWNER=${{ github.repository_owner }}
+          PACKAGE=${{ github.event.repository.name }}
+          echo "Attempting to set package visibility for ${PACKAGE} under ${OWNER} to public"
+          # Try organization endpoint first
+          ORG_URL="https://api.github.com/orgs/${OWNER}/packages/container/${PACKAGE}/visibility"
+          USER_URL="https://api.github.com/user/packages/container/${PACKAGE}/visibility"
+
+          echo "Trying org endpoint: $ORG_URL"
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PUT -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GHCR_TOKEN}" $ORG_URL -d '{"visibility":"public"}')
+          if [ "$CODE" = "200" ] || [ "$CODE" = "201" ]; then
+            echo "Package visibility set to public via org endpoint"
+            exit 0
+          fi
+
+          echo "Org endpoint returned $CODE, trying user endpoint: $USER_URL"
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PUT -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GHCR_TOKEN}" $USER_URL -d '{"visibility":"public"}')
+          if [ "$CODE" = "200" ] || [ "$CODE" = "201" ]; then
+            echo "Package visibility set to public via user endpoint"
+            exit 0
+          fi
+
+          echo "Failed to set package visibility (last HTTP code: $CODE). Ensure secret GHCR_TOKEN is set and has 'packages:write' scope."
+          exit 1
           
       - name: Build ISO
         run: |
@@ -85,6 +121,64 @@ jobs:
           cd output
           sha256sum *.iso > SHA256SUMS
           cat SHA256SUMS
+
+      - name: Verify ISO built
+        run: |
+          set -e
+          ISO_FILE=$(ls output/*.iso 2>/dev/null | head -1 || true)
+          if [ -z "$ISO_FILE" ]; then
+            echo "ERROR: no ISO found in output/ — failing the job"
+            ls -la output || true
+            exit 1
+          fi
+          echo "Found ISO: $ISO_FILE"
+
+      - name: Create tag (for manual dispatch)
+        if: github.event_name == 'workflow_dispatch' && steps.version.outputs.version != 'dev' && !startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          VERSION=${{ steps.version.outputs.version }}
+          echo "Creating and pushing tag v${VERSION}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${VERSION}" -m "Release v${VERSION}"
+          git push origin "v${VERSION}"
+
+      - name: Create Release (manual dispatch)
+        if: github.event_name == 'workflow_dispatch' && steps.version.outputs.version != 'dev'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          files: |
+            output/*.iso
+            output/SHA256SUMS
+          body: |
+            ## RuntipiOS Release ${{ steps.version.outputs.version }}
+            
+            ### What's Included
+            - Lightweight Debian-based OS
+            - Graphical configuration wizard for:
+              - WiFi setup (if no ethernet)
+              - SSH user creation
+              - Password configuration
+            - Automatic Runtipi installation
+            - Connection address display
+            
+            ### Installation
+            1. Download the ISO file
+            2. Write it to a USB drive using tools like Balena Etcher or `dd`
+            3. Boot from the USB drive
+            4. Follow the on-screen configuration wizard
+            5. Access Runtipi at the displayed address
+            
+            ### Checksums
+            See SHA256SUMS file for verification
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')

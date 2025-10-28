@@ -17,7 +17,7 @@ if [ -f /tmp/config.yml ]; then
     eval $(grep -E "^\s*ssid:" /tmp/config.yml | sed 's/^[[:space:]]*ssid:[[:space:]]*/WIFI_CONNECT_SSID=/' | sed 's/"//g')
 fi
 
-WIFI_CONNECT_VERSION=${WIFI_CONNECT_VERSION:-"4.4.7"}
+WIFI_CONNECT_VERSION=${WIFI_CONNECT_VERSION:-"4.4.6"}
 WIFI_CONNECT_SSID=${WIFI_CONNECT_SSID:-"RuntipiOS-Setup"}
 ARCH="aarch64"
 

@@ -24,7 +24,7 @@ runtipi:
 # Configuration WiFi-Connect (Balena)
 wifi_connect:
 # Version de wifi-connect (voir https://github.com/balena-os/wifi-connect/releases)
-  version: "4.4.7"
+  version: "4.4.6"
 # SSID du point d'accès de configuration        
   ssid: "RuntipiOS-Setup"
 # Laissez vide pour un réseau ouvert

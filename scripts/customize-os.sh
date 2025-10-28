@@ -1,5 +1,6 @@
 #!/bin/bash
 # Script de customisation du système d'exploitation
+# ⚠️ IMPORTANT: Docker sera installé automatiquement par Runtipi
 
 set -e
 
@@ -61,7 +62,9 @@ log "Mise à jour des paquets..."
 apt-get update
 DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
 
-# Installer les paquets nécessaires
+# ============================================================================
+# INSTALLER LES PAQUETS NÉCESSAIRES - SANS DOCKER
+# ============================================================================
 log "Installation des paquets..."
 DEBIAN_FRONTEND=noninteractive apt-get install -y \
     git \
@@ -81,29 +84,20 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
     python3-yaml \
     ca-certificates \
     gnupg \
-    lsb-release
+    lsb-release \
+    openssh-server
 
-# Installer Docker
-log "Installation de Docker..."
-if ! command -v docker &> /dev/null; then
-    curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
-    sh /tmp/get-docker.sh
-    rm /tmp/get-docker.sh
-    log "✓ Docker installé"
-else
-    log "Docker déjà installé"
-fi
+log "✓ Paquets installés"
 
-# Installer Docker Compose
-log "Installation de Docker Compose..."
-DOCKER_COMPOSE_VERSION="v2.24.5"
-curl -L "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-chmod +x /usr/local/bin/docker-compose
+# ============================================================================
+# ⚠️ DOCKER SERA INSTALLÉ PAR RUNTIPI AUTOMATIQUEMENT
+# ============================================================================
+log "Note: Docker sera installé automatiquement par Runtipi au premier démarrage"
 
 # Créer l'utilisateur
 log "Création de l'utilisateur $DEFAULT_USER..."
 if ! id "$DEFAULT_USER" &>/dev/null; then
-    useradd -m -s /bin/bash -G sudo,docker "$DEFAULT_USER"
+    useradd -m -s /bin/bash -G sudo "$DEFAULT_USER"
     echo "$DEFAULT_USER:$DEFAULT_PASSWORD" | chpasswd
     log "✓ Utilisateur créé"
 else
@@ -120,13 +114,20 @@ chown -R $DEFAULT_USER:$DEFAULT_USER /home/$DEFAULT_USER/.ssh
 systemctl enable ssh
 
 # Configurer Avahi (mDNS)
-log "Configuration d'Avahi..."
+log "Configuration d'Avahi (mDNS)..."
 systemctl enable avahi-daemon
 
-# Nettoyer les paquets inutiles
-log "Nettoyage..."
+# ============================================================================
+# NETTOYAGE AGRESSIF POUR ÉCONOMISER DE L'ESPACE
+# ============================================================================
+log "Nettoyage des paquets..."
 apt-get autoremove -y
 apt-get clean
+rm -rf /var/lib/apt/lists/*
+rm -rf /tmp/*
+rm -rf /var/tmp/*
+
+log "✓ Nettoyage effectué"
 
 # Créer le répertoire de configuration
 mkdir -p /etc/runtipios
@@ -152,11 +153,11 @@ Accès:
   - Runtipi: http://runtipios.local ou http://$(hostname -I | awk '{print $1}')
   - SSH: ssh runtipi@runtipios.local
 
-Documentation: https://github.com/votre-username/runtipios
+Documentation: https://runtipi.io
 
 EOF
 
-# Créer la page de statut web
+# Créer la page de statut web (légère)
 log "Création de la page de statut..."
 mkdir -p /var/www/html
 cat > /var/www/html/index.html << 'EOF'
@@ -173,7 +174,7 @@ cat > /var/www/html/index.html << 'EOF'
             box-sizing: border-box;
         }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: #fff;
             min-height: 100vh;
@@ -221,7 +222,7 @@ cat > /var/www/html/index.html << 'EOF'
             font-weight: 600;
         }
         .status-value {
-            font-family: 'Courier New', monospace;
+            font-family: monospace;
             background: rgba(0, 0, 0, 0.2);
             padding: 5px 10px;
             border-radius: 5px;
@@ -247,27 +248,19 @@ cat > /var/www/html/index.html << 'EOF'
             flex-wrap: wrap;
             margin-top: 30px;
         }
-        .loading {
-            text-align: center;
-            padding: 20px;
-        }
-        .spinner {
-            border: 3px solid rgba(255, 255, 255, 0.3);
-            border-top: 3px solid #fff;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 20px auto;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
         .logo {
             text-align: center;
             margin-bottom: 20px;
             font-size: 4em;
+        }
+        .info {
+            background: rgba(255, 255, 255, 0.1);
+            border-left: 4px solid rgba(255, 255, 255, 0.5);
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            font-size: 0.9em;
+            line-height: 1.5;
         }
     </style>
 </head>
@@ -280,53 +273,46 @@ cat > /var/www/html/index.html << 'EOF'
         <div class="status">
             <div class="status-item">
                 <span class="status-label">Hostname</span>
-                <span class="status-value" id="hostname">Loading...</span>
+                <span class="status-value" id="hostname">runtipios</span>
             </div>
             <div class="status-item">
-                <span class="status-label">Adresse IP</span>
-                <span class="status-value" id="ip">Loading...</span>
-            </div>
-            <div class="status-item">
-                <span class="status-label">Runtipi</span>
-                <span class="status-value" id="runtipi-status">En cours d'installation...</span>
+                <span class="status-label">État</span>
+                <span class="status-value" id="status">✓ Prêt</span>
             </div>
         </div>
         
         <div class="buttons">
             <a href="http://runtipios.local" class="button">Accéder à Runtipi</a>
-            <a href="https://github.com/runtipi/runtipi" class="button" target="_blank">Documentation</a>
+        </div>
+
+        <div class="info">
+            <strong>ℹ️ Information:</strong><br>
+            Runtipi est en cours d'installation au premier démarrage.<br>
+            Cela peut prendre 10-15 minutes. Vérifiez votre connexion réseau.
         </div>
     </div>
-    
-    <script>
-        // Charger les informations du système
-        async function loadStatus() {
-            try {
-                // Hostname
-                document.getElementById('hostname').textContent = window.location.hostname;
-                
-                // IP
-                const response = await fetch('/runtipi-info.json');
-                if (response.ok) {
-                    const data = await response.json();
-                    document.getElementById('runtipi-status').textContent = 
-                        data.status === 'running' ? '✓ Installé' : 'En cours...';
-                }
-            } catch (error) {
-                console.error('Error loading status:', error);
-            }
-        }
-        
-        loadStatus();
-        setInterval(loadStatus, 10000); // Rafraîchir toutes les 10s
-    </script>
 </body>
 </html>
 EOF
 
-# Installer un serveur web léger pour la page de statut
+# Installer un serveur web léger UNIQUEMENT pour la page de statut
+log "Installation du serveur web léger..."
 apt-get install -y lighttpd
 systemctl enable lighttpd
 
+# Nettoyage final
+log "Nettoyage final..."
+rm -rf /tmp/*
+apt-get clean
+
 log "✓ Customisation terminée"
+log "======================================"
+log ""
+log "✅ Le système est prêt!"
+log ""
+log "Prochaines étapes:"
+log "  1. Runtipi s'installera automatiquement au premier démarrage"
+log "  2. Docker sera installé par Runtipi"
+log "  3. Connectez-vous via WiFi 'RuntipiOS-Setup'"
+log ""
 log "======================================"

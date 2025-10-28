@@ -65,7 +65,7 @@ network:
 # Options de build
 build:
 # Taille de l'image (en Go)
-  image_size: 8
+  image_size: 1
   
 # Compression de l'image finale
   compress: true

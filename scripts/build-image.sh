@@ -1,8 +1,8 @@
-!/bin/bash
+#!/bin/bash
 set -euo pipefail
 
-# RuntipiOS Image Builder - Version complète et corrigée
-# Pour GitHub Actions (x86-64 avec kpartx fallback)
+# RuntipiOS Image Builder - Version complète avec QEMU et correction OUTPUT_NAME
+# Pour GitHub Actions (x86-64 avec support ARM64 via QEMU)
 
 # Couleurs pour les logs
 RED='\033[0;31m'
@@ -110,6 +110,37 @@ echo "  - Runtipi: ${CONFIG_runtipi_version}"
 echo "  - WiFi-Connect: ${CONFIG_wifi_connect_version}"
 echo "  - Hostname: ${CONFIG_system_hostname}"
 echo "  - Image size: ${CONFIG_build_image_size} GB"
+echo ""
+
+# ============================================================================
+# ACTIVATION QEMU POUR SUPPORT ARM64
+# ============================================================================
+log_info "Vérification de l'architecture..."
+CURRENT_ARCH=$(uname -m)
+TARGET_ARCH="${CONFIG_raspios_arch}"
+
+log_info "Architecture courante: $CURRENT_ARCH"
+log_info "Architecture cible: $TARGET_ARCH"
+
+# Si on est en x86-64 et cible ARM, activer QEMU
+if [ "$CURRENT_ARCH" = "x86_64" ] && [ "$TARGET_ARCH" = "arm64" ]; then
+    log_info "Activation de QEMU pour support ARM64..."
+    
+    # Enregistrer les formats binaires
+    if command -v update-binfmts &> /dev/null; then
+        update-binfmts --enable qemu-aarch64 2>/dev/null || log_warning "update-binfmts warning (non-critique)"
+    fi
+    
+    # Vérifier que QEMU est disponible
+    if ! command -v qemu-aarch64-static &> /dev/null; then
+        log_error "qemu-aarch64-static non trouvé!"
+        log_error "Vérifiez que le Dockerfile installe qemu-user-static"
+        exit 1
+    fi
+    
+    log_success "QEMU ARM64 activé"
+fi
+
 echo ""
 
 # Créer les répertoires de travail
@@ -232,6 +263,13 @@ log_info "Configuration du système..."
 # Copier les résolveurs DNS
 cp /etc/resolv.conf "${MOUNT_DIR}/etc/resolv.conf"
 
+# Copier QEMU si nécessaire pour le chroot
+if [ "$CURRENT_ARCH" = "x86_64" ] && [ "$TARGET_ARCH" = "arm64" ]; then
+    log_info "Copie de QEMU ARM64 dans le chroot..."
+    mkdir -p "${MOUNT_DIR}/usr/bin"
+    cp /usr/bin/qemu-aarch64-static "${MOUNT_DIR}/usr/bin/" 2>/dev/null || log_warning "QEMU copy failed"
+fi
+
 # Monter les pseudo-filesystems pour chroot
 log_info "Préparation du chroot..."
 mount -t proc proc "${MOUNT_DIR}/proc"
@@ -288,9 +326,16 @@ LOOP_DEVICE=""
 
 log_success "Image démontée"
 
+# ============================================================================
 # Copier et compresser l'image finale
+# ============================================================================
 log_info "Préparation de l'image finale..."
-OUTPUT_NAME="${OUTPUT_NAME:-RuntipiOS-$(date +%Y%m%d)}-${CONFIG_raspios_arch}"
+
+# Si OUTPUT_NAME n'est pas défini (passé par la ligne de commande), le créer
+if [ -z "${OUTPUT_NAME:-}" ]; then
+    OUTPUT_NAME="RuntipiOS-$(date +%Y%m%d)-${CONFIG_raspios_arch}"
+fi
+
 FINAL_IMAGE="${OUTPUT_DIR}/${OUTPUT_NAME}.img"
 
 cp "$BASE_IMAGE" "$FINAL_IMAGE"
@@ -322,7 +367,7 @@ if [ "${CONFIG_build_compress}" = "true" ]; then
 fi
 
 # ============================================================================
-# NETTOYAGE DES FICHIERS TEMPORAIRES - NOUVELLE SECTION AJOUTÉE
+# NETTOYAGE DES FICHIERS TEMPORAIRES
 # ============================================================================
 log_info "Nettoyage des fichiers temporaires..."
 
@@ -374,3 +419,4 @@ echo "  - Utilisez Raspberry Pi Imager: https://www.raspberrypi.com/software/"
 echo "  - Ou Etcher: https://www.balena.io/etcher/"
 echo ""
 log_info "N'oubliez pas de changer le mot de passe par défaut après le premier démarrage !"
+

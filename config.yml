@@ -69,7 +69,8 @@ build:
   
 # Compression de l'image finale
   compress: true
-  compression_format: "xz"  # Options: xz, gz, zip
+# Options: xz, gz, zip
+  compression_format: "gz"  
   
 # Hostname de build (pour logs)
   build_hostname: "runtipios-builder"

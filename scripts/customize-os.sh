@@ -124,7 +124,6 @@ log "Nettoyage des paquets..."
 apt-get autoremove -y
 apt-get clean
 rm -rf /var/lib/apt/lists/*
-rm -rf /tmp/*
 rm -rf /var/tmp/*
 
 log "✓ Nettoyage effectué"
@@ -300,10 +299,10 @@ log "Installation du serveur web léger..."
 apt-get install -y lighttpd
 systemctl enable lighttpd
 
-# Nettoyage final
+# Nettoyage final - NE PAS supprimer /tmp/* car les autres scripts en ont besoin !
 log "Nettoyage final..."
-rm -rf /tmp/*
 apt-get clean
+# IMPORTANT: Laisser /tmp/ intact pour que WiFi-Connect et autres scripts puissent lire config.yml
 
 log "✓ Customisation terminée"
 log "======================================"
@@ -316,3 +315,4 @@ log "  2. Docker sera installé par Runtipi"
 log "  3. Connectez-vous via WiFi 'RuntipiOS-Setup'"
 log ""
 log "======================================"
+

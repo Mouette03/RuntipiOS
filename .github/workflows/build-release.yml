@@ -32,6 +32,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       config_hash: ${{ steps.config.outputs.hash }}
       repo_lower: ${{ steps.repo.outputs.repo_lower }}
+      compression_format: ${{ steps.config.outputs.compression_format }}
     
     steps:
       - name: Checkout repository
@@ -65,7 +66,6 @@ jobs:
       - name: Sanitize repository name
         id: repo
         run: |
-          # Convertir le nom du repository en minuscules
           REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           echo "repo_lower=$REPO_LOWER" >> $GITHUB_OUTPUT
           echo "Repository (lowercase): $REPO_LOWER"
@@ -81,6 +81,11 @@ jobs:
           CONFIG_HASH=$(sha256sum config.yml | cut -d' ' -f1 | cut -c1-8)
           echo "hash=$CONFIG_HASH" >> $GITHUB_OUTPUT
           echo "📝 Config hash: $CONFIG_HASH"
+          
+          COMPRESSION_FORMAT=$(grep -A2 "^build:" config.yml | grep "compression_format:" | awk -F'"' '{print $2}' | awk '{print $1}')
+          [ -z "$COMPRESSION_FORMAT" ] && COMPRESSION_FORMAT="xz"
+          echo "compression_format=$COMPRESSION_FORMAT" >> $GITHUB_OUTPUT
+          echo "📦 Compression format: $COMPRESSION_FORMAT"
           
           echo "📋 Configuration:"
           cat config.yml
@@ -169,6 +174,7 @@ jobs:
           echo "🔨 Building Raspberry Pi OS image..."
           echo "Version: ${{ needs.build-image.outputs.version }}"
           echo "Config hash: ${{ needs.build-image.outputs.config_hash }}"
+          echo "Compression: ${{ needs.build-image.outputs.compression_format }}"
           
           OUTPUT_NAME="RuntipiOS-${{ needs.build-image.outputs.version }}-arm64"
           echo "OUTPUT_NAME=$OUTPUT_NAME" >> $GITHUB_ENV
@@ -187,13 +193,28 @@ jobs:
           echo "📦 Checking output directory:"
           ls -lh output/
           
-          if ls output/*.img* 1> /dev/null 2>&1; then
-            echo "✅ Image file(s) found!"
-            for img in output/*.img*; do
+          COMPRESSION_FORMAT="${{ needs.build-image.outputs.compression_format }}"
+          
+          if ls output/*.img.$COMPRESSION_FORMAT 1> /dev/null 2>&1; then
+            echo "✅ Compressed image found with format: $COMPRESSION_FORMAT"
+            for img in output/*.img.$COMPRESSION_FORMAT; do
               echo "  - $(basename $img): $(du -h $img | cut -f1)"
             done
           else
-            echo "❌ ERROR: No image file found!"
+            echo "❌ ERROR: No compressed image with format $COMPRESSION_FORMAT found!"
+            exit 1
+          fi
+          
+          if ls output/*.img.* 1> /dev/null 2>&1; then
+            FILE_COUNT=$(ls output/*.img.* | wc -l)
+            if [ "$FILE_COUNT" -gt 1 ]; then
+              echo "⚠️  WARNING: Multiple image formats found!"
+              ls output/*.img.*
+            fi
+          fi
+          
+          if ls output/*.img 1> /dev/null 2>&1; then
+            echo "❌ ERROR: Uncompressed .img file found! Should be cleaned."
             exit 1
           fi
 
@@ -202,14 +223,14 @@ jobs:
           cd output
           echo "🔐 Generating checksums..."
           sha256sum * > SHA256SUMS
-          echo "Checksums:"
+          echo "Checksums generated:"
           cat SHA256SUMS
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: runtipios-${{ needs.build-image.outputs.version }}
-          path: output/*
+          path: output/
           retention-days: 30
           if-no-files-found: error
           compression-level: 0
@@ -236,6 +257,14 @@ jobs:
           echo "📋 Downloaded artifacts:"
           ls -lh artifacts/
           
+          COMPRESSION_FORMAT="${{ needs.build-image.outputs.compression_format }}"
+          
+          FILE_COUNT=$(ls artifacts/*.img.* 2>/dev/null | wc -l)
+          if [ "$FILE_COUNT" -eq 0 ]; then
+            echo "❌ ERROR: No compressed image found!"
+            exit 1
+          fi
+          
           cd artifacts
           if [ -f SHA256SUMS ]; then
             echo "🔐 Verifying checksums..."
@@ -259,53 +288,17 @@ jobs:
           
           ### 🔧 Installation
           
-          1. **Téléchargez** le fichier `.img.xz` depuis les assets ci-dessous
+          1. **Téléchargez** le fichier `.img.${{ needs.build-image.outputs.compression_format }}` depuis les assets ci-dessous
           2. **Flashez** sur une carte microSD (minimum 8 Go) avec [Raspberry Pi Imager](https://www.raspberrypi.com/software/) ou Etcher
           3. **Insérez** la carte SD dans votre Raspberry Pi et démarrez
           4. **Connectez-vous** au WiFi "RuntipiOS-Setup" avec votre smartphone
-          5. **Configurez** :
-             - Nom d'utilisateur SSH
-             - Mot de passe SSH
-             - Réseau WiFi et mot de passe
+          5. **Configurez** vos identifiants et réseau WiFi
           6. **Attendez** l'installation de Runtipi (environ 10-15 minutes)
           7. **Accédez** à Runtipi sur `http://runtipios.local`
-          
-          ### 🌍 Langues Supportées
-          
-          - 🇬🇧 English
-          - 🇫🇷 Français
-          
-          ### 🔐 Configuration SSH
-          
-          Vous définissez votre propre utilisateur et mot de passe lors de la première configuration.
-          
-          ### 🌐 Accès
-          
-          Après configuration :
-          - **Runtipi**: `http://runtipios.local` ou `http://<IP>:80`
-          - **SSH**: `ssh votre-utilisateur@runtipios.local`
-          - **Page de statut**: `http://runtipios.local:8080`
-          
-          ### 📝 Configuration
-          
-          Le fichier `config.yml` utilisé pour cette build est disponible dans le repository.
-          Vous pouvez le modifier et rebuilder pour personnaliser votre image.
-          
-          ### 🐛 Problèmes connus
-          
-          - Le premier démarrage peut prendre 2-3 minutes
-          - L'installation de Runtipi nécessite une connexion Internet
-          - Le portail captif peut ne pas s'afficher automatiquement sur certains Android : ouvrez manuellement un navigateur
           
           ### 📊 Checksums
           
           Voir le fichier `SHA256SUMS` pour vérifier l'intégrité de l'image.
-          
-          ### 🙏 Remerciements
-          
-          - [Runtipi](https://runtipi.io/) - Le serveur personnel
-          - [Balena WiFi-Connect](https://github.com/balena-os/wifi-connect) - Portail captif
-          - [Raspberry Pi Foundation](https://www.raspberrypi.org/) - Raspberry Pi OS
           EOF
 
       - name: Create Release
@@ -314,7 +307,9 @@ jobs:
           tag_name: v${{ needs.build-image.outputs.version }}
           name: RuntipiOS v${{ needs.build-image.outputs.version }}
           body_path: release_notes.md
-          files: artifacts/*
+          files: |
+            artifacts/*.img.*
+            artifacts/SHA256SUMS
           draft: false
           prerelease: ${{ contains(needs.build-image.outputs.version, 'dev') || contains(needs.build-image.outputs.version, 'alpha') || contains(needs.build-image.outputs.version, 'beta') }}
           generate_release_notes: false

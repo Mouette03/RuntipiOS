@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# RuntipiOS Image Builder - Version complète et corrigée
+# RuntipiOS Image Builder
 # Pour GitHub Actions (x86-64 avec kpartx fallback)
 
 # Couleurs pour les logs
@@ -110,6 +110,7 @@ echo "  - Runtipi: ${CONFIG_runtipi_version}"
 echo "  - WiFi-Connect: ${CONFIG_wifi_connect_version}"
 echo "  - Hostname: ${CONFIG_system_hostname}"
 echo "  - Image size: ${CONFIG_build_image_size} GB"
+echo "  - Compression: ${CONFIG_build_compression} (${CONFIG_build_compression_format})"
 echo ""
 
 # Créer les répertoires de travail
@@ -321,6 +322,38 @@ if [ "${CONFIG_build_compress}" = "true" ]; then
     log_success "Image compressée: $(basename $FINAL_IMAGE)"
 fi
 
+# Nettoyage des fichiers temporaires - GARDER UNIQUEMENT LE FICHIER FINAL COMPRESSÉ
+log_info "Nettoyage des fichiers temporaires..."
+
+# Supprimer les fichiers téléchargés/extraits de WORK_DIR
+rm -f "${WORK_DIR}/raspios-base.img.xz"
+rm -f "${WORK_DIR}/raspios-base.img"
+log_info "Fichiers temporaires de téléchargement supprimés"
+
+# Supprimer les formats de compression inutilisés
+if [ "${CONFIG_build_compress}" = "true" ]; then
+    case "${CONFIG_build_compression_format}" in
+        xz)
+            rm -f "${OUTPUT_DIR}/${OUTPUT_NAME}.img.gz" 2>/dev/null || true
+            rm -f "${OUTPUT_DIR}/${OUTPUT_NAME}.img.zip" 2>/dev/null || true
+            ;;
+        gz)
+            rm -f "${OUTPUT_DIR}/${OUTPUT_NAME}.img.xz" 2>/dev/null || true
+            rm -f "${OUTPUT_DIR}/${OUTPUT_NAME}.img.zip" 2>/dev/null || true
+            ;;
+        zip)
+            rm -f "${OUTPUT_DIR}/${OUTPUT_NAME}.img.xz" 2>/dev/null || true
+            rm -f "${OUTPUT_DIR}/${OUTPUT_NAME}.img.gz" 2>/dev/null || true
+            ;;
+    esac
+    
+    # Supprimer l'image brute si elle existe (on a la version compressée)
+    rm -f "${OUTPUT_DIR}/${OUTPUT_NAME}.img" 2>/dev/null || true
+    log_info "Formats de compression inutilisés supprimés"
+fi
+
+log_success "Nettoyage terminé"
+
 # Afficher les informations finales
 log_success "======================================"
 log_success "Build terminé avec succès !"
@@ -330,8 +363,9 @@ echo "Image finale: $(basename $FINAL_IMAGE)"
 echo "Taille: $(du -h $FINAL_IMAGE | cut -f1)"
 echo "Emplacement: $FINAL_IMAGE"
 echo ""
+echo "Fichiers restants dans output/:"
+ls -lh "${OUTPUT_DIR}/"
+echo ""
 echo "Pour flasher l'image sur une carte SD:"
 echo "  - Utilisez Raspberry Pi Imager: https://www.raspberrypi.com/software/"
 echo "  - Ou Etcher: https://www.balena.io/etcher/"
-echo ""
-log_info "N'oubliez pas de changer le mot de passe par défaut après le premier démarrage !"

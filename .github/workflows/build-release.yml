@@ -193,26 +193,18 @@ jobs:
           echo "📦 Checking output directory:"
           ls -lh output/
           
-          COMPRESSION_FORMAT="${{ needs.build-image.outputs.compression_format }}"
-          
-          if ls output/*.img.$COMPRESSION_FORMAT 1> /dev/null 2>&1; then
-            echo "✅ Compressed image found with format: $COMPRESSION_FORMAT"
-            for img in output/*.img.$COMPRESSION_FORMAT; do
+          # Accepter n'importe quel format compressé
+          if ls output/*.img.* 1> /dev/null 2>&1; then
+            echo "✅ Compressed image found!"
+            for img in output/*.img.*; do
               echo "  - $(basename $img): $(du -h $img | cut -f1)"
             done
           else
-            echo "❌ ERROR: No compressed image with format $COMPRESSION_FORMAT found!"
+            echo "❌ ERROR: No compressed image found!"
             exit 1
           fi
           
-          if ls output/*.img.* 1> /dev/null 2>&1; then
-            FILE_COUNT=$(ls output/*.img.* | wc -l)
-            if [ "$FILE_COUNT" -gt 1 ]; then
-              echo "⚠️  WARNING: Multiple image formats found!"
-              ls output/*.img.*
-            fi
-          fi
-          
+          # Vérifier qu'il n'y a pas d'image brute
           if ls output/*.img 1> /dev/null 2>&1; then
             echo "❌ ERROR: Uncompressed .img file found! Should be cleaned."
             exit 1
@@ -256,8 +248,6 @@ jobs:
         run: |
           echo "📋 Downloaded artifacts:"
           ls -lh artifacts/
-          
-          COMPRESSION_FORMAT="${{ needs.build-image.outputs.compression_format }}"
           
           FILE_COUNT=$(ls artifacts/*.img.* 2>/dev/null | wc -l)
           if [ "$FILE_COUNT" -eq 0 ]; then

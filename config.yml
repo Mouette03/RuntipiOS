@@ -3,26 +3,37 @@
 
 # Version de Raspberry Pi OS à utiliser
 raspios:
-  version: "2025-10-01"  # Dernière version stable (Trixie)
-  variant: "lite"         # Options: lite, desktop, full
-  arch: "arm64"           # Options: arm64, armhf
+# Dernière version stable (Trixie)
+  version: "2025-10-01"  
+# Options: lite, desktop, full
+  variant: "lite"
+# Options: arm64, armhf         
+  arch: "arm64"           
   url: "https://downloads.raspberrypi.com/raspios_lite_arm64/images/raspios_lite_arm64-2025-10-02/2025-10-01-raspios-trixie-arm64-lite.img.xz"
 
 # Version de Runtipi
 runtipi:
-  version: "v4.5.3"       # Version de Runtipi à installer (voir https://github.com/runtipi/runtipi/releases)
-  auto_install: true      # Installer automatiquement au premier démarrage
-  install_timeout: 1800   # Timeout d'installation en secondes (30 min)
+# Version de Runtipi à installer (voir https://github.com/runtipi/runtipi/releases)
+  version: "v4.5.3"
+# Installer automatiquement au premier démarrage       
+  auto_install: true
+# Timeout d'installation en secondes (30 min)    
+  install_timeout: 1800   
   repo_url: "https://github.com/runtipi/runtipi.git"
 
 # Configuration WiFi-Connect (Balena)
 wifi_connect:
-  version: "4.4.7"        # Version de wifi-connect (voir https://github.com/balena-os/wifi-connect/releases)
-  ssid: "RuntipiOS-Setup" # SSID du point d'accès de configuration
-  password: ""            # Laissez vide pour un réseau ouvert
+# Version de wifi-connect (voir https://github.com/balena-os/wifi-connect/releases)
+  version: "4.4.7"
+# SSID du point d'accès de configuration        
+  ssid: "RuntipiOS-Setup"
+# Laissez vide pour un réseau ouvert
+  password: ""            
   portal_interface: "wlan0"
-  timeout: 1800           # Timeout du portail captif (30 min)
-  activity_timeout: 0     # 0 = pas de timeout d'inactivité
+# Timeout du portail captif (30 min)
+  timeout: 1800
+# 0 = pas de timeout d'inactivité
+  activity_timeout: 0     
   ui_path: "/usr/local/share/wifi-connect/ui"
 
 # Configuration système
@@ -32,48 +43,49 @@ system:
   locale: "fr_FR.UTF-8"
   keyboard_layout: "fr"
   
-  # Utilisateur par défaut (sera remplacé par la config du portail captif)
-  # Ces valeurs ne sont utilisées QUE si le portail captif n'est pas utilisé
+# Utilisateur par défaut (sera remplacé par la config du portail captif)
+# Ces valeurs ne sont utilisées QUE si le portail captif n'est pas utilisé
   default_user: "runtipi"
-  default_password: "runtipi"  # SERA REMPLACÉ lors de la configuration via portail
+# SERA REMPLACÉ lors de la configuration via portail
+  default_password: "runtipi"  
   
-  # SSH
+# SSH
   enable_ssh: true
   ssh_password_auth: true
   ssh_port: 22
 
 # Configuration réseau
 network:
-  # Si Ethernet est branché, sauter la configuration WiFi
+# Si Ethernet est branché, sauter la configuration WiFi
   ethernet_priority: true
   
-  # Configuration WiFi de secours (fichier sur boot)
+# Configuration WiFi de secours (fichier sur boot)
   enable_wifi_fallback: true
 
 # Options de build
 build:
-  # Taille de l'image (en Go)
+# Taille de l'image (en Go)
   image_size: 8
   
-  # Compression de l'image finale
+# Compression de l'image finale
   compress: true
   compression_format: "xz"  # Options: xz, gz, zip
   
-  # Hostname de build (pour logs)
+# Hostname de build (pour logs)
   build_hostname: "runtipios-builder"
 
 # Services additionnels
 services:
-  # Avahi (mDNS) pour résolution .local
+# Avahi (mDNS) pour résolution .local
   enable_avahi: true
   
-  # Docker (requis pour Runtipi)
-  # NOTE: Runtipi installe automatiquement Docker et Docker Compose
-  # Ces paramètres sont pour référence uniquement
+# Docker (requis pour Runtipi)
+# NOTE: Runtipi installe automatiquement Docker et Docker Compose
+# Ces paramètres sont pour référence uniquement
   docker:
     version: "latest"
   
-  # Page de statut web
+# Page de statut web
   status_page:
     enable: true
     port: 8080
@@ -81,16 +93,16 @@ services:
 
 # Sécurité
 security:
-  # Changer les mots de passe au premier login
+# Changer les mots de passe au premier login
   force_password_change: false
   
-  # Désactiver l'utilisateur pi par défaut (s'il existe)
+# Désactiver l'utilisateur pi par défaut (s'il existe)
   disable_default_user: false
   
-  # Configurer le pare-feu
+# Configurer le pare-feu
   enable_firewall: false
   
-  # Activer les mises à jour automatiques de sécurité
+# Activer les mises à jour automatiques de sécurité
   enable_unattended_upgrades: true
 
 # Packages additionnels à installer
@@ -108,9 +120,10 @@ packages:
     - avahi-utils
     - network-manager
     - dnsmasq
-    - jq  # Requis pour le backend wifi-connect
+    - jq
+# Requis pour le backend wifi-connect
   
-  # Packages à supprimer pour gagner de l'espace
+# Packages à supprimer pour gagner de l'espace
   remove:
     - wolfram-engine
     - libreoffice*

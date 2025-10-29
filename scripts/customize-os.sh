@@ -419,11 +419,6 @@ cat > /var/www/html/index.html << 'EOF'
 </html>
 EOF
 
-# Installer un serveur web léger UNIQUEMENT pour la page de statut
-log "Installation du serveur web léger..."
-apt-get install -y lighttpd
-systemctl enable lighttpd
-
 # Nettoyage final - NE PAS supprimer /tmp/* car les autres scripts en ont besoin !
 log "Nettoyage final..."
 apt-get clean

@@ -13,13 +13,29 @@ log "======================================"
 log "Customisation du système"
 log "======================================"
 
-# Charger la configuration depuis /tmp/config.yml
-CONFIG_FILE="/tmp/config.yml"
+# ============================================================================
+# CHARGER LA CONFIGURATION
+# ============================================================================
+
+# Fonction pour trouver le fichier config (persistant ou temporaire)
+get_config_file() {
+    if [ -f /etc/runtipios/config.yml ]; then
+        echo /etc/runtipios/config.yml
+    elif [ -f /tmp/config.yml ]; then
+        echo /tmp/config.yml
+    else
+        echo /tmp/config.yml  # Défaut
+    fi
+}
+
+CONFIG_FILE=$(get_config_file)
 
 # Parser le YAML (version simplifiée)
 parse_config() {
     local key=$1
-    grep -E "^\s*${key}:" "$CONFIG_FILE" | sed "s/^[[:space:]]*${key}:[[:space:]]*//g" | sed 's/"//g' | sed "s/'//g"
+    if [ -f "$CONFIG_FILE" ]; then
+        grep -E "^\s*${key}:" "$CONFIG_FILE" | sed "s/^[[:space:]]*${key}:[[:space:]]*//g" | sed 's/"//g' | sed "s/'//g"
+    fi
 }
 
 # Configuration système
@@ -35,6 +51,7 @@ WIFI_COUNTRY=$(parse_config "wifi_country")
 HOSTNAME=${HOSTNAME:-runtipios}
 TIMEZONE=${TIMEZONE:-Europe/Paris}
 LOCALE=${LOCALE:-fr_FR.UTF-8}
+KEYBOARD=${KEYBOARD:-fr}
 DEFAULT_USER=${DEFAULT_USER:-runtipi}
 DEFAULT_PASSWORD=${DEFAULT_PASSWORD:-runtipi}
 WIFI_COUNTRY=${WIFI_COUNTRY:-FR}
@@ -43,12 +60,9 @@ log "Configuration du système:"
 log " - Hostname: $HOSTNAME"
 log " - Timezone: $TIMEZONE"
 log " - Locale: $LOCALE"
+log " - Clavier: $KEYBOARD"
 log " - User: $DEFAULT_USER"
 log " - WiFi Country: $WIFI_COUNTRY"
-
-# ============================================================================
-# AFFICHER LE DESSIN RUNTIPI
-# ============================================================================
 
 log ""
 log "╔════════════════════════════════════════════════════╗"
@@ -60,6 +74,7 @@ log "║                                                    ║"
 log "║         Hostname: $HOSTNAME"
 log "║         Timezone: $TIMEZONE"
 log "║         Locale: $LOCALE"
+log "║         Clavier: $KEYBOARD"
 log "║                                                    ║"
 log "╚════════════════════════════════════════════════════╝"
 log ""
@@ -88,6 +103,27 @@ log "Configuration de la locale..."
 sed -i "s/^# *${LOCALE}/${LOCALE}/" /etc/locale.gen
 locale-gen
 update-locale LANG=$LOCALE
+
+# ============================================================================
+# CONFIGURER LE CLAVIER - CORRECTION CRITIQUE #1
+# ============================================================================
+
+log "Configuration du clavier: $KEYBOARD..."
+
+mkdir -p /etc/default
+
+cat > /etc/default/keyboard << KEYBOARDEOF
+XKBMODEL="pc105"
+XKBLAYOUT="$KEYBOARD"
+XKBVARIANT="latin9"
+BACKSPACE="guess"
+KEYBOARDEOF
+
+# Charger la configuration
+setupcon 2>/dev/null || log "setupcon non disponible (non-critique)"
+localctl set-keymap "$KEYBOARD" 2>/dev/null || log "localctl non disponible (non-critique)"
+
+log "✓ Clavier configuré: $KEYBOARD"
 
 # ============================================================================
 # DÉSACTIVER LE WIZARD DE PREMIÈRE INSTALLATION
@@ -272,7 +308,7 @@ systemctl restart ssh
 log "✓ SSH configuré"
 
 # ============================================================================
-# CONFIGURER SUDO SANS MOT DE PASSE POUR LE GROUPE RUNTIPI
+# CONFIGURER SUDO SANS MOT DE PASSE POUR L'UTILISATEUR
 # ============================================================================
 
 log "Configuration de sudo pour l'utilisateur $DEFAULT_USER..."
@@ -295,6 +331,11 @@ log "Création des fichiers de configuration..."
 # Créer le répertoire de configuration
 mkdir -p /etc/runtipios
 
+# Copier la configuration (persistante)
+if [ -f /tmp/config.yml ]; then
+    cp /tmp/config.yml /etc/runtipios/config.yml
+fi
+
 # Créer un fichier de configuration pour Runtipi
 cat > /etc/runtipios/config.yml << 'CONFEOF'
 # Configuration RuntipiOS
@@ -302,6 +343,7 @@ system:
   hostname: runtipios
   timezone: Europe/Paris
   locale: fr_FR.UTF-8
+  keyboard_layout: fr
 
 runtipi:
   version: v4.5.3

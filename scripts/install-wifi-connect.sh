@@ -1,59 +1,116 @@
 #!/bin/bash
-# Script d'installation de Balena WiFi-Connect
-# Avec dépendances strictes et délais systemd
+
+# Script d'installation de Balena WiFi-Connect - VERSION FINALE CORRIGÉE
+# Avec dépendances strictes, délais systemd et toutes les variables parsées
 
 set -e
 
 log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a /var/log/wifi-connect-install.log
 }
 
 log "======================================"
-log "Installation de WiFi-Connect"
+log "Installation de WiFi-Connect - VERSION FINALE"
 log "======================================"
 
-# Charger la configuration
-if [ -f /tmp/config.yml ]; then
-    eval $(grep -E "^\s*version:" /tmp/config.yml | grep wifi_connect -A 1 | tail -1 | sed 's/^[[:space:]]*version:[[:space:]]*/WIFI_CONNECT_VERSION=/' | sed 's/"//g')
-    eval $(grep -E "^\s*ssid:" /tmp/config.yml | sed 's/^[[:space:]]*ssid:[[:space:]]*/WIFI_CONNECT_SSID=/' | sed 's/"//g')
-fi
+# ============================================================================
+# CHARGER LA CONFIGURATION
+# ============================================================================
 
+get_config_file() {
+    if [ -f /etc/runtipios/config.yml ]; then
+        echo /etc/runtipios/config.yml
+    elif [ -f /tmp/config.yml ]; then
+        echo /tmp/config.yml
+    else
+        echo /tmp/config.yml
+    fi
+}
+
+CONFIG_FILE=$(get_config_file)
+
+parse_config() {
+    local key=$1
+    if [ -f "$CONFIG_FILE" ]; then
+        grep -E "^\s*${key}:" "$CONFIG_FILE" | sed "s/^[[:space:]]*${key}:[[:space:]]*//g" | sed 's/"//g' | sed "s/'//g"
+    fi
+}
+
+# Parser toutes les variables
+WIFI_CONNECT_VERSION=$(parse_config "wifi_connect_version")
+WIFI_CONNECT_SSID=$(parse_config "wifi_connect_ssid")
+WIFI_COUNTRY=$(parse_config "wifi_country")
+
+# Valeurs par défaut
 WIFI_CONNECT_VERSION=${WIFI_CONNECT_VERSION:-"4.4.6"}
 WIFI_CONNECT_SSID=${WIFI_CONNECT_SSID:-"RuntipiOS-Setup"}
-ARCH="aarch64"
+WIFI_COUNTRY=${WIFI_COUNTRY:-"FR"}
 
-# Déterminer l'architecture
-if [ "$(uname -m)" = "armv7l" ]; then
-    ARCH="armv7hf"
-fi
+# Détection architecture - CORRECTION #2
+ARCH=$(uname -m)
+case "$ARCH" in
+    armv6l)
+        ARCH="armv6"
+        ;;
+    armv7l)
+        ARCH="armv7hf"
+        ;;
+    aarch64)
+        ARCH="aarch64"
+        ;;
+    *)
+        log "⚠️ Architecture non standard détectée: $ARCH"
+        ARCH="aarch64"  # Défaut
+        ;;
+esac
 
-log "Version: ${WIFI_CONNECT_VERSION}"
-log "SSID: ${WIFI_CONNECT_SSID}"
-log "Architecture: ${ARCH}"
+log "Configuration chargée:"
+log " - WiFi-Connect Version: ${WIFI_CONNECT_VERSION}"
+log " - WiFi SSID: ${WIFI_CONNECT_SSID}"
+log " - WiFi Country: ${WIFI_COUNTRY}"
+log " - Architecture: ${ARCH}"
 
 # ============================================================================
-# INSTALLER LES DÉPENDANCES REQUISES
+# INSTALLATION DES DÉPENDANCES
 # ============================================================================
-log "Installation des dépendances (jq, dnsmasq, etc.)..."
+
+log "Installation des dépendances..."
 apt-get update
-apt-get install -y jq dnsmasq
+apt-get install -y \
+    jq \
+    dnsmasq \
+    hostapd \
+    rfkill \
+    iw
 
-# Télécharger WiFi-Connect
-log "Téléchargement de WiFi-Connect..."
+log "✓ Dépendances installées"
+
+# ============================================================================
+# TÉLÉCHARGER ET INSTALLER WIFI-CONNECT
+# ============================================================================
+
+log "Téléchargement de WiFi-Connect v${WIFI_CONNECT_VERSION} (${ARCH})..."
+
+mkdir -p /usr/local/bin
+mkdir -p /usr/local/share/wifi-connect/ui
+mkdir -p /var/log
+
 DOWNLOAD_URL="https://github.com/balena-os/wifi-connect/releases/download/v${WIFI_CONNECT_VERSION}/wifi-connect-v${WIFI_CONNECT_VERSION}-linux-${ARCH}.tar.gz"
 
-wget -O /tmp/wifi-connect.tar.gz "$DOWNLOAD_URL"
-
-# Extraire
-log "Extraction..."
-tar -xzf /tmp/wifi-connect.tar.gz -C /usr/local/bin/
+cd /tmp
+wget -q "$DOWNLOAD_URL" -O wifi-connect.tar.gz
+tar -xzf wifi-connect.tar.gz
+cp wifi-connect /usr/local/bin/
 chmod +x /usr/local/bin/wifi-connect
 
-# Créer le répertoire pour l'interface utilisateur personnalisée
-mkdir -p /usr/local/share/wifi-connect/ui
+log "✓ WiFi-Connect téléchargé et installé"
 
-# Créer l'interface HTML personnalisée AVEC SÉLECTEUR DE PAYS
-log "Création de l'interface web personnalisée..."
+# ============================================================================
+# CRÉER L'INTERFACE HTML MULTILINGUE (FR/EN) AVEC SÉLECTEUR PAYS
+# ============================================================================
+
+log "Création de l'interface web..."
+
 cat > /usr/local/share/wifi-connect/ui/index.html << 'HTMLEOF'
 <!DOCTYPE html>
 <html lang="en">
@@ -296,11 +353,9 @@ cat > /usr/local/share/wifi-connect/ui/index.html << 'HTMLEOF'
             .container {
                 padding: 20px;
             }
-            
             h1 {
                 font-size: 1.5em;
             }
-            
             .button-group {
                 flex-direction: column;
             }
@@ -309,50 +364,48 @@ cat > /usr/local/share/wifi-connect/ui/index.html << 'HTMLEOF'
 </head>
 <body>
     <div class="container">
-        <div class="logo">🚀</div>
+        <div class="logo">🔧</div>
         <h1 id="title">RuntipiOS Setup</h1>
         <p class="subtitle" id="subtitle">First time configuration</p>
         
         <div class="language-selector">
-            <button class="lang-btn active" onclick="setLanguage('en')" data-lang="en">🇬🇧 English</button>
-            <button class="lang-btn" onclick="setLanguage('fr')" data-lang="fr">🇫🇷 Français</button>
+            <button class="lang-btn active" onclick="setLanguage('en')" data-lang="en">English</button>
+            <button class="lang-btn" onclick="setLanguage('fr')" data-lang="fr">Français</button>
         </div>
         
         <div class="step-indicator">
             <div class="step-dot active"></div>
             <div class="step-dot"></div>
             <div class="step-dot"></div>
+            <div class="step-dot"></div>
         </div>
         
         <form id="setupForm">
-            <!-- Étape 1: Configuration SSH -->
+            <!-- Step 1: SSH Configuration -->
             <div class="step active" data-step="1">
                 <div class="info-box">
                     <p id="info-step1">Configure your SSH credentials for secure remote access.</p>
                 </div>
                 
                 <div class="form-group">
-                    <label for="ssh_username" id="label-ssh-user">SSH Username</label>
-                    <input type="text" id="ssh_username" name="ssh_username" required 
-                           placeholder="runtipi" value="runtipi">
+                    <label for="sshusername" id="label-ssh-user">SSH Username</label>
+                    <input type="text" id="sshusername" name="sshusername" required placeholder="runtipi" value="runtipi">
                 </div>
                 
                 <div class="form-group">
-                    <label for="ssh_password" id="label-ssh-pass">SSH Password</label>
+                    <label for="sshpassword" id="label-ssh-pass">SSH Password</label>
                     <div class="password-toggle">
-                        <input type="password" id="ssh_password" name="ssh_password" required 
-                               placeholder="••••••••" minlength="8">
-                        <button type="button" onclick="togglePassword('ssh_password')">👁️</button>
+                        <input type="password" id="sshpassword" name="sshpassword" required placeholder="" minlength="8">
+                        <button type="button" onclick="togglePassword('sshpassword')">👁️</button>
                     </div>
                     <small id="hint-ssh-pass" style="color: #999;">Minimum 8 characters</small>
                 </div>
                 
                 <div class="form-group">
-                    <label for="ssh_password_confirm" id="label-ssh-pass-confirm">Confirm Password</label>
+                    <label for="sshpasswordconfirm" id="label-ssh-pass-confirm">Confirm Password</label>
                     <div class="password-toggle">
-                        <input type="password" id="ssh_password_confirm" required 
-                               placeholder="••••••••" minlength="8">
-                        <button type="button" onclick="togglePassword('ssh_password_confirm')">👁️</button>
+                        <input type="password" id="sshpasswordconfirm" required placeholder="" minlength="8">
+                        <button type="button" onclick="togglePassword('sshpasswordconfirm')">👁️</button>
                     </div>
                 </div>
                 
@@ -361,62 +414,58 @@ cat > /usr/local/share/wifi-connect/ui/index.html << 'HTMLEOF'
                 </div>
             </div>
             
-            <!-- Étape 2: Configuration WiFi + PAYS -->
+            <!-- Step 2: WiFi Configuration with Country Selection -->
             <div class="step" data-step="2">
                 <div class="info-box">
                     <p id="info-step2">Select your WiFi network, country, and enter the password.</p>
                 </div>
                 
                 <div class="form-group">
-                    <label for="wifi_country" id="label-wifi-country">WiFi Country / Regulatory Domain</label>
-                    <select id="wifi_country" name="wifi_country" required>
-                        <option value="FR" selected>🇫🇷 France (FR)</option>
-                        <option value="US">🇺🇸 United States (US)</option>
-                        <option value="GB">🇬🇧 United Kingdom (GB)</option>
-                        <option value="DE">🇩🇪 Germany (DE)</option>
-                        <option value="ES">🇪🇸 Spain (ES)</option>
-                        <option value="IT">🇮🇹 Italy (IT)</option>
-                        <option value="CA">🇨🇦 Canada (CA)</option>
-                        <option value="AU">🇦🇺 Australia (AU)</option>
-                        <option value="JP">🇯🇵 Japan (JP)</option>
-                        <option value="CN">🇨🇳 China (CN)</option>
-                        <option value="BR">🇧🇷 Brazil (BR)</option>
-                        <option value="IN">🇮🇳 India (IN)</option>
-                        <option value="RU">🇷🇺 Russia (RU)</option>
-                        <option value="NL">🇳🇱 Netherlands (NL)</option>
-                        <option value="BE">🇧🇪 Belgium (BE)</option>
-                        <option value="CH">🇨🇭 Switzerland (CH)</option>
-                        <option value="SE">🇸🇪 Sweden (SE)</option>
-                        <option value="NO">🇳🇴 Norway (NO)</option>
-                        <option value="DK">🇩🇰 Denmark (DK)</option>
-                        <option value="FI">🇫🇮 Finland (FI)</option>
-                        <option value="PL">🇵🇱 Poland (PL)</option>
-                        <option value="PT">🇵🇹 Portugal (PT)</option>
-                        <option value="AT">🇦🇹 Austria (AT)</option>
-                        <option value="IE">🇮🇪 Ireland (IE)</option>
-                        <option value="NZ">🇳🇿 New Zealand (NZ)</option>
-                        <option value="ZA">🇿🇦 South Africa (ZA)</option>
+                    <label for="wificountry" id="label-wifi-country">WiFi Country Regulatory Domain</label>
+                    <select id="wificountry" name="wificountry" required>
+                        <option value="FR" selected>France (FR)</option>
+                        <option value="US">United States (US)</option>
+                        <option value="GB">United Kingdom (GB)</option>
+                        <option value="DE">Germany (DE)</option>
+                        <option value="ES">Spain (ES)</option>
+                        <option value="IT">Italy (IT)</option>
+                        <option value="CA">Canada (CA)</option>
+                        <option value="AU">Australia (AU)</option>
+                        <option value="JP">Japan (JP)</option>
+                        <option value="CN">China (CN)</option>
+                        <option value="BR">Brazil (BR)</option>
+                        <option value="IN">India (IN)</option>
+                        <option value="RU">Russia (RU)</option>
+                        <option value="NL">Netherlands (NL)</option>
+                        <option value="BE">Belgium (BE)</option>
+                        <option value="CH">Switzerland (CH)</option>
+                        <option value="SE">Sweden (SE)</option>
+                        <option value="NO">Norway (NO)</option>
+                        <option value="DK">Denmark (DK)</option>
+                        <option value="FI">Finland (FI)</option>
+                        <option value="PL">Poland (PL)</option>
+                        <option value="PT">Portugal (PT)</option>
+                        <option value="AT">Austria (AT)</option>
+                        <option value="IE">Ireland (IE)</option>
+                        <option value="NZ">New Zealand (NZ)</option>
+                        <option value="ZA">South Africa (ZA)</option>
                     </select>
                     <small id="hint-wifi-country" style="color: #999;">Required for regulatory compliance</small>
                 </div>
                 
                 <div class="form-group">
-                    <label for="ssid" id="label-ssid">WiFi Network (SSID)</label>
+                    <label for="ssid" id="label-ssid">WiFi Network SSID</label>
                     <select id="ssid" name="ssid" required>
                         <option value="" id="option-select">Select a network...</option>
                     </select>
-                    <button type="button" onclick="scanNetworks()" id="btn-scan" 
-                            style="margin-top: 10px; width: 100%;" class="btn-secondary">
-                        🔄 Scan networks
-                    </button>
+                    <button type="button" onclick="scanNetworks()" id="btn-scan" style="margin-top: 10px; width: 100%;" class="btn-secondary">Scan networks</button>
                 </div>
                 
                 <div class="form-group">
-                    <label for="wifi_password" id="label-wifi-pass">WiFi Password</label>
+                    <label for="wifipassword" id="label-wifi-pass">WiFi Password</label>
                     <div class="password-toggle">
-                        <input type="password" id="wifi_password" name="wifi_password" 
-                               placeholder="••••••••">
-                        <button type="button" onclick="togglePassword('wifi_password')">👁️</button>
+                        <input type="password" id="wifipassword" name="wifipassword" placeholder="">
+                        <button type="button" onclick="togglePassword('wifipassword')">👁️</button>
                     </div>
                     <small id="hint-wifi-pass" style="color: #999;">Leave empty for open networks</small>
                 </div>
@@ -427,7 +476,7 @@ cat > /usr/local/share/wifi-connect/ui/index.html << 'HTMLEOF'
                 </div>
             </div>
             
-            <!-- Étape 3: Confirmation -->
+            <!-- Step 3: Confirmation -->
             <div class="step" data-step="3">
                 <div class="info-box">
                     <p id="info-step3">Review your configuration before applying.</p>
@@ -435,11 +484,11 @@ cat > /usr/local/share/wifi-connect/ui/index.html << 'HTMLEOF'
                 
                 <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
                     <h3 id="review-title" style="margin-bottom: 15px; color: #667eea;">Configuration Summary</h3>
-                    <p><strong id="review-ssh-user-label">SSH Username:</strong> <span id="review_ssh_username"></span></p>
-                    <p><strong id="review-ssh-pass-label">SSH Password:</strong> ••••••••</p>
-                    <p><strong id="review-country-label">WiFi Country:</strong> <span id="review_wifi_country"></span></p>
-                    <p><strong id="review-ssid-label">WiFi Network:</strong> <span id="review_ssid"></span></p>
-                    <p><strong id="review-wifi-pass-label">WiFi Password:</strong> <span id="review_wifi_password"></span></p>
+                    <p><strong id="review-ssh-user-label">SSH Username</strong><br><span id="reviewsshusername"></span></p>
+                    <p><strong id="review-ssh-pass-label">SSH Password</strong><br><span id="reviewsshpassword">••••••••</span></p>
+                    <p><strong id="review-country-label">WiFi Country</strong><br><span id="reviewwificountry"></span></p>
+                    <p><strong id="review-ssid-label">WiFi Network</strong><br><span id="reviewssid"></span></p>
+                    <p><strong id="review-wifi-pass-label">WiFi Password</strong><br><span id="reviewwifipassword"></span></p>
                 </div>
                 
                 <div class="button-group">
@@ -448,7 +497,7 @@ cat > /usr/local/share/wifi-connect/ui/index.html << 'HTMLEOF'
                 </div>
             </div>
             
-            <!-- Étape 4: Application en cours -->
+            <!-- Step 4: Application in progress -->
             <div class="step" data-step="4">
                 <div class="loading">
                     <div class="spinner"></div>
@@ -462,78 +511,78 @@ cat > /usr/local/share/wifi-connect/ui/index.html << 'HTMLEOF'
     <script>
         const translations = {
             en: {
-                title: "RuntipiOS Setup",
-                subtitle: "First time configuration",
-                'info-step1': "Configure your SSH credentials for secure remote access.",
-                'label-ssh-user': "SSH Username",
-                'label-ssh-pass': "SSH Password",
-                'hint-ssh-pass': "Minimum 8 characters",
-                'label-ssh-pass-confirm': "Confirm Password",
-                'btn-next-1': "Next",
-                'info-step2': "Select your WiFi network, country, and enter the password.",
-                'label-wifi-country': "WiFi Country / Regulatory Domain",
-                'hint-wifi-country': "Required for regulatory compliance",
-                'label-ssid': "WiFi Network (SSID)",
-                'option-select': "Select a network...",
-                'btn-scan': "🔄 Scan networks",
-                'label-wifi-pass': "WiFi Password",
-                'hint-wifi-pass': "Leave empty for open networks",
-                'btn-prev-2': "Previous",
-                'btn-next-2': "Next",
-                'info-step3': "Review your configuration before applying.",
-                'review-title': "Configuration Summary",
-                'review-ssh-user-label': "SSH Username:",
-                'review-ssh-pass-label': "SSH Password:",
-                'review-country-label': "WiFi Country:",
-                'review-ssid-label': "WiFi Network:",
-                'review-wifi-pass-label': "WiFi Password:",
-                'btn-prev-3': "Previous",
-                'btn-apply': "Apply Configuration",
-                'applying-title': "Applying configuration...",
-                'applying-text': "This may take a few moments. Please wait.",
-                'error-passwords': "Passwords do not match!",
-                'error-password-length': "Password must be at least 8 characters!",
-                'error-ssid': "Please select a WiFi network!",
-                'error-network': "Error connecting. Please check your credentials.",
-                'success-title': "Configuration successful!",
-                'success-text': "The system is rebooting. You can access it at:"
+                title: 'RuntipiOS Setup',
+                subtitle: 'First time configuration',
+                'info-step1': 'Configure your SSH credentials for secure remote access.',
+                'label-ssh-user': 'SSH Username',
+                'label-ssh-pass': 'SSH Password',
+                'hint-ssh-pass': 'Minimum 8 characters',
+                'label-ssh-pass-confirm': 'Confirm Password',
+                'btn-next-1': 'Next',
+                'info-step2': 'Select your WiFi network, country, and enter the password.',
+                'label-wifi-country': 'WiFi Country Regulatory Domain',
+                'hint-wifi-country': 'Required for regulatory compliance',
+                'label-ssid': 'WiFi Network SSID',
+                'option-select': 'Select a network...',
+                'btn-scan': 'Scan networks',
+                'label-wifi-pass': 'WiFi Password',
+                'hint-wifi-pass': 'Leave empty for open networks',
+                'btn-prev-2': 'Previous',
+                'btn-next-2': 'Next',
+                'info-step3': 'Review your configuration before applying.',
+                'review-title': 'Configuration Summary',
+                'review-ssh-user-label': 'SSH Username',
+                'review-ssh-pass-label': 'SSH Password',
+                'review-country-label': 'WiFi Country',
+                'review-ssid-label': 'WiFi Network',
+                'review-wifi-pass-label': 'WiFi Password',
+                'btn-prev-3': 'Previous',
+                'btn-apply': 'Apply Configuration',
+                'applying-title': 'Applying configuration...',
+                'applying-text': 'This may take a few moments. Please wait.',
+                'error-passwords': 'Passwords do not match!',
+                'error-password-length': 'Password must be at least 8 characters!',
+                'error-ssid': 'Please select a WiFi network!',
+                'error-network': 'Error connecting. Please check your credentials.',
+                'success-title': 'Configuration successful!',
+                'success-text': 'The system is rebooting. You can access it at http://runtipios.local'
             },
             fr: {
-                title: "Configuration RuntipiOS",
-                subtitle: "Configuration initiale",
-                'info-step1': "Configurez vos identifiants SSH pour un accès distant sécurisé.",
-                'label-ssh-user': "Nom d'utilisateur SSH",
-                'label-ssh-pass': "Mot de passe SSH",
-                'hint-ssh-pass': "Minimum 8 caractères",
-                'label-ssh-pass-confirm': "Confirmer le mot de passe",
-                'btn-next-1': "Suivant",
-                'info-step2': "Sélectionnez votre pays, réseau WiFi et entrez le mot de passe.",
-                'label-wifi-country': "Pays WiFi / Domaine réglementaire",
-                'hint-wifi-country': "Requis pour la conformité réglementaire",
-                'label-ssid': "Réseau WiFi (SSID)",
-                'option-select': "Sélectionner un réseau...",
-                'btn-scan': "🔄 Scanner les réseaux",
-                'label-wifi-pass': "Mot de passe WiFi",
-                'hint-wifi-pass': "Laisser vide pour les réseaux ouverts",
-                'btn-prev-2': "Précédent",
-                'btn-next-2': "Suivant",
-                'info-step3': "Vérifiez votre configuration avant de l'appliquer.",
-                'review-title': "Résumé de la configuration",
-                'review-ssh-user-label': "Utilisateur SSH :",
-                'review-ssh-pass-label': "Mot de passe SSH :",
-                'review-country-label': "Pays WiFi :",
-                'review-ssid-label': "Réseau WiFi :",
-                'review-wifi-pass-label': "Mot de passe WiFi :",
-                'btn-prev-3': "Précédent",
-                'btn-apply': "Appliquer la configuration",
-                'applying-title': "Application de la configuration...",
-                'applying-text': "Cela peut prendre quelques instants. Veuillez patienter.",
-                'error-passwords': "Les mots de passe ne correspondent pas !",
-                'error-password-length': "Le mot de passe doit contenir au moins 8 caractères !",
-                'error-ssid': "Veuillez sélectionner un réseau WiFi !",
-                'error-network': "Erreur de connexion. Vérifiez vos identifiants.",
-                'success-title': "Configuration réussie !",
-                'success-text': "Le système redémarre. Vous pouvez y accéder à :"
+                title: 'Configuration RuntipiOS',
+                subtitle: 'Configuration initiale',
+                'info-step1': 'Configurez vos identifiants SSH pour un accès distant sécurisé.',
+                'label-ssh-user': 'Nom d\'utilisateur SSH',
+                'label-ssh-pass': 'Mot de passe SSH',
+                'hint-ssh-pass': 'Minimum 8 caractères',
+                'label-ssh-pass-confirm': 'Confirmer le mot de passe',
+                'btn-next-1': 'Suivant',
+                'info-step2': 'Sélectionnez votre pays, réseau WiFi et entrez le mot de passe.',
+                'label-wifi-country': 'Pays WiFi (Domaine réglementaire)',
+                'hint-wifi-country': 'Requis pour la conformité réglementaire',
+                'label-ssid': 'Réseau WiFi (SSID)',
+                'option-select': 'Sélectionner un réseau...',
+                'btn-scan': 'Scanner les réseaux',
+                'label-wifi-pass': 'Mot de passe WiFi',
+                'hint-wifi-pass': 'Laisser vide pour les réseaux ouverts',
+                'btn-prev-2': 'Précédent',
+                'btn-next-2': 'Suivant',
+                'info-step3': 'Vérifiez votre configuration avant de l\'appliquer.',
+                'review-title': 'Résumé de la configuration',
+                'review-ssh-user-label': 'Utilisateur SSH',
+                'review-ssh-pass-label': 'Mot de passe SSH',
+                'review-country-label': 'Pays WiFi',
+                'review-ssid-label': 'Réseau WiFi',
+                'review-wifi-pass-label': 'Mot de passe WiFi',
+                'btn-prev-3': 'Précédent',
+                'btn-apply': 'Appliquer la configuration',
+                'applying-title': 'Application de la configuration...',
+                'applying-text': 'Cela peut prendre quelques instants. Veuillez patienter.',
+                'error-passwords': 'Les mots de passe ne correspondent pas !',
+                'error-password-length': 'Le mot de passe doit contenir au moins 8 caractères !',
+                'error-ssid': 'Veuillez sélectionner un réseau WiFi !',
+                'error-network': 'Erreur de connexion. Vérifiez vos identifiants.',
+                'success-title': 'Configuration réussie !',
+                'success-text': 'Le système redémarre. Vous pouvez y accéder à http://runtipios.local'
             }
         };
         
@@ -560,25 +609,31 @@ cat > /usr/local/share/wifi-connect/ui/index.html << 'HTMLEOF'
         
         function nextStep() {
             if (currentStep === 1) {
-                const password = document.getElementById('ssh_password').value;
-                const confirm = document.getElementById('ssh_password_confirm').value;
-                if (password.length < 8 || password !== confirm) {
+                const password = document.getElementById('sshpassword').value;
+                const confirm = document.getElementById('sshpasswordconfirm').value;
+                if (password.length < 8) {
                     alert(translations[currentLang]['error-password-length']);
                     return;
                 }
+                if (password !== confirm) {
+                    alert(translations[currentLang]['error-passwords']);
+                    return;
+                }
             }
+            
             if (currentStep === 2) {
                 const ssid = document.getElementById('ssid').value;
                 if (!ssid) {
                     alert(translations[currentLang]['error-ssid']);
                     return;
                 }
-                document.getElementById('review_ssh_username').textContent = document.getElementById('ssh_username').value;
-                const countrySelect = document.getElementById('wifi_country');
-                document.getElementById('review_wifi_country').textContent = countrySelect.options[countrySelect.selectedIndex].text;
-                document.getElementById('review_ssid').textContent = ssid;
-                document.getElementById('review_wifi_password').textContent = document.getElementById('wifi_password').value ? '••••••••' : '(Open)';
+                document.getElementById('reviewsshusername').textContent = document.getElementById('sshusername').value;
+                const countrySelect = document.getElementById('wificountry');
+                document.getElementById('reviewwificountry').textContent = countrySelect.options[countrySelect.selectedIndex].text;
+                document.getElementById('reviewssid').textContent = ssid;
+                document.getElementById('reviewwifipassword').textContent = document.getElementById('wifipassword').value ? '••••••••' : 'Open';
             }
+            
             currentStep++;
             updateSteps();
         }
@@ -606,7 +661,7 @@ cat > /usr/local/share/wifi-connect/ui/index.html << 'HTMLEOF'
                 networks.forEach(network => {
                     const option = document.createElement('option');
                     option.value = network.ssid;
-                    option.textContent = `${network.ssid} (${network.signal}%)`;
+                    option.textContent = network.ssid + (network.signal ? ` (${network.signal}%)` : '');
                     select.appendChild(option);
                 });
             } catch (error) {
@@ -620,11 +675,11 @@ cat > /usr/local/share/wifi-connect/ui/index.html << 'HTMLEOF'
             updateSteps();
             
             const data = {
-                ssh_username: document.getElementById('ssh_username').value,
-                ssh_password: document.getElementById('ssh_password').value,
-                wifi_country: document.getElementById('wifi_country').value,
+                sshusername: document.getElementById('sshusername').value,
+                sshpassword: document.getElementById('sshpassword').value,
+                wificountry: document.getElementById('wificountry').value,
                 ssid: document.getElementById('ssid').value,
-                password: document.getElementById('wifi_password').value
+                password: document.getElementById('wifipassword').value
             };
             
             try {
@@ -635,127 +690,37 @@ cat > /usr/local/share/wifi-connect/ui/index.html << 'HTMLEOF'
                 });
                 
                 if (response.ok) {
-                    document.querySelector('[data-step="4"]').innerHTML = `<div class="success"><h3>${translations[currentLang]['success-title']}</h3><p>${translations[currentLang]['success-text']}</p><p style="margin-top: 15px;"><strong>http://runtipios.local</strong></p></div>`;
+                    document.querySelector('[data-step="4"]').innerHTML = `
+                        <div class="success">
+                            <h3>${translations[currentLang]['success-title']}</h3>
+                            <p>${translations[currentLang]['success-text']}</p>
+                        </div>
+                    `;
                 }
             } catch (error) {
-                document.querySelector('[data-step="4"]').innerHTML = `<div class="error"><p>${translations[currentLang]['error-network']}</p></div>`;
+                document.querySelector('[data-step="4"]').innerHTML = `
+                    <div class="error">
+                        <p>${translations[currentLang]['error-network']}</p>
+                    </div>
+                `;
             }
         });
         
-        window.addEventListener('load', () => scanNetworks());
+        window.addEventListener('load', scanNetworks);
     </script>
 </body>
 </html>
 HTMLEOF
 
-log "✓ Interface HTML créée"
+log "✓ Interface HTML créée avec sélecteur de pays WiFi"
 
-# Créer le backend CORRIGÉ avec attente NetworkManager
-cat > /usr/local/bin/wifi-connect-backend.sh << 'BACKENDEOF'
-#!/bin/bash
-set -e
+# ============================================================================
+# CRÉER LE SCRIPT DE VÉRIFICATION WIFI CORRIGÉ
+# ============================================================================
 
-log() {
-    echo "[$(date)] $1" | tee -a /var/log/wifi-connect-backend.log
-}
+log "Création du script de vérification WiFi..."
 
-CONFIG_FILE="/tmp/wifi-connect-config.json"
-
-apply_wifi_country() {
-    local country=$1
-    log "Configuration du pays WiFi: $country"
-    
-    if command -v raspi-config &>/dev/null; then
-        raspi-config nonint do_wifi_country "$country" 2>&1 || true
-    fi
-    
-    mkdir -p /etc/wpa_supplicant
-    if grep -q "^country=" /etc/wpa_supplicant/wpa_supplicant.conf 2>/dev/null; then
-        sed -i "s/^country=.*/country=$country/" /etc/wpa_supplicant/wpa_supplicant.conf
-    else
-        echo "country=$country" >> /etc/wpa_supplicant/wpa_supplicant.conf
-    fi
-    
-    if [ -f /boot/firmware/config.txt ]; then
-        sed -i '/^country=/d' /boot/firmware/config.txt
-        echo "country=$country" >> /boot/firmware/config.txt
-    fi
-    
-    rfkill unblock wifi 2>/dev/null || true
-    rfkill unblock wlan 2>/dev/null || true
-    
-    log "✓ Pays WiFi: $country"
-}
-
-apply_ssh_config() {
-    local username=$1
-    local password=$2
-    
-    log "Configuration SSH: $username"
-    
-    if ! id "$username" &>/dev/null; then
-        useradd -m -s /bin/bash -G sudo,netdev "$username"
-    fi
-    
-    echo "$username:$password" | chpasswd
-    mkdir -p /home/$username/.ssh
-    chmod 700 /home/$username/.ssh
-    chown -R $username:$username /home/$username/.ssh
-    
-    log "✓ SSH configuré"
-}
-
-apply_wifi_config() {
-    local ssid=$1
-    local password=$2
-    
-    log "Connexion WiFi: $ssid"
-    
-    for i in {1..30}; do
-        if systemctl is-active NetworkManager &>/dev/null; then
-            break
-        fi
-        sleep 1
-    done
-    
-    if [ -n "$password" ]; then
-        nmcli device wifi connect "$ssid" password "$password" 2>&1 || true
-    else
-        nmcli device wifi connect "$ssid" 2>&1 || true
-    fi
-    
-    log "✓ WiFi configuré"
-}
-
-if [ "$1" = "apply" ] && [ -f "$CONFIG_FILE" ]; then
-    CONFIG=$(cat "$CONFIG_FILE")
-    
-    SSH_USERNAME=$(echo "$CONFIG" | jq -r '.ssh_username // "runtipi"')
-    SSH_PASSWORD=$(echo "$CONFIG" | jq -r '.ssh_password')
-    WIFI_COUNTRY=$(echo "$CONFIG" | jq -r '.wifi_country // "FR"')
-    SSID=$(echo "$CONFIG" | jq -r '.ssid')
-    WIFI_PASSWORD=$(echo "$CONFIG" | jq -r '.password // ""')
-    
-    log "Application de la configuration"
-    
-    apply_wifi_country "$WIFI_COUNTRY"
-    apply_ssh_config "$SSH_USERNAME" "$SSH_PASSWORD"
-    apply_wifi_config "$SSID" "$WIFI_PASSWORD"
-    
-    touch /etc/runtipi-configured
-    
-    log "Redémarrage..."
-    sleep 3
-    reboot
-fi
-BACKENDEOF
-
-chmod +x /usr/local/bin/wifi-connect-backend.sh
-
-log "✓ Backend créé"
-
-# Script de vérification amélioré
-cat > /usr/local/bin/wifi-connect-check.sh << 'EOF'
+cat > /usr/local/bin/wifi-connect-check.sh << 'CHECKEOF'
 #!/bin/bash
 set -e
 
@@ -765,10 +730,12 @@ log() {
 
 log "Vérification connectivité"
 
+# Si déjà configuré, sortir
 if [ -f /etc/runtipi-configured ]; then
     exit 0
 fi
 
+# Attendre NetworkManager
 log "Attente NetworkManager..."
 for i in {1..60}; do
     if systemctl is-active NetworkManager &>/dev/null; then
@@ -780,27 +747,27 @@ done
 
 sleep 5
 
-# CORRECTION : Vérifier que Ethernet ou WiFi a une IP (pas juste "UP")
+# CORRECTION #3 : Vérifier que Ethernet ou WiFi a une IP (pas juste "UP")
 log "Vérification réseau..."
 for i in {1..30}; do
     # Vérifier Ethernet
     if ip addr show eth0 2>/dev/null | grep -q "inet "; then
-        log "✓ Ethernet configuré"
+        log "✓ Ethernet configuré avec IP"
         touch /etc/runtipi-configured
         exit 0
     fi
-
+    
     # Vérifier WiFi
     if ip addr show wlan0 2>/dev/null | grep -q "inet "; then
-        log "✓ WiFi configuré"
+        log "✓ WiFi configuré avec IP"
         touch /etc/runtipi-configured
         exit 0
     fi
-
+    
     sleep 1
 done
 
-# Pas de réseau, lancer WiFi-Connect
+# Pas de réseau détecté, lancer WiFi-Connect
 log "Aucun réseau détecté, lancement WiFi-Connect"
 rfkill unblock wifi 2>/dev/null || true
 rfkill unblock wlan 2>/dev/null || true
@@ -809,10 +776,15 @@ exec /usr/local/bin/wifi-connect \
     --portal-ssid "RuntipiOS-Setup" \
     --portal-interface wlan0 \
     --ui-directory /usr/local/share/wifi-connect/ui
-EOF
-
+CHECKEOF
 
 chmod +x /usr/local/bin/wifi-connect-check.sh
+
+log "✓ Script de vérification WiFi créé"
+
+# ============================================================================
+# CRÉER LE SCRIPT D'INSTALLATION RUNTIPI
+# ============================================================================
 
 log "Création du script d'installation Runtipi..."
 
@@ -841,11 +813,14 @@ chmod +x /usr/local/bin/install-runtipi.sh
 
 log "✓ Script d'installation Runtipi créé"
 
-log "✓ Script vérification créé"
+# ============================================================================
+# CONFIGURER LES SERVICES SYSTEMD
+# ============================================================================
 
-# Service systemd CORRIGÉ
-log "Configuration du service systemd..."
-cat > /etc/systemd/system/wifi-connect.service << 'EOF'
+log "Configuration des services systemd..."
+
+# Service WiFi-Connect
+cat > /etc/systemd/system/wifi-connect.service << 'WIFISVCEOF'
 [Unit]
 Description=Balena WiFi Connect - Captive Portal
 After=NetworkManager.service network-online.target unblock-rfkill.service
@@ -867,15 +842,70 @@ KillMode=process
 
 [Install]
 WantedBy=multi-user.target
-EOF
+WIFISVCEOF
+
+# Service Runtipi Installer
+cat > /etc/systemd/system/runtipi-installer.service << 'RUNTIPISVCEOF'
+[Unit]
+Description=Runtipi Auto-Installer
+After=network-online.target wifi-connect.service
+Wants=network-online.target
+ConditionPathExists=!/etc/runtipi-configured
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/install-runtipi.sh
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=1800
+
+[Install]
+WantedBy=multi-user.target
+RUNTIPISVCEOF
 
 systemctl daemon-reload
 systemctl enable wifi-connect.service
+systemctl enable runtipi-installer.service
 
-log "✓ Service configuré"
+log "✓ Services systemd configurés"
+
+# ============================================================================
+# CONFIGURER DNSMASQ POUR LE PORTAIL CAPTIF
+# ============================================================================
+
+log "Configuration de dnsmasq..."
+
+cat > /etc/dnsmasq.d/wifi-connect << 'DNSMASQEOF'
+interface=wlan0
+dhcp-range=192.168.4.2,192.168.4.254,12h
+dhcp-option=option:router,192.168.4.1
+address=/#/192.168.4.1
+listen-address=192.168.4.1
+DNSMASQEOF
+
+log "✓ dnsmasq configuré"
+
+# ============================================================================
+# NETTOYAGE
+# ============================================================================
+
+log "Nettoyage..."
 
 rm -f /tmp/wifi-connect.tar.gz
+apt-get clean
 
-log "======================================"
-log "Installation terminée ✓"
-log "======================================"
+log ""
+log "╔════════════════════════════════════════════════════╗"
+log "║                                                    ║"
+log "║     ✓ Installation WiFi-Connect terminée !        ║"
+log "║                                                    ║"
+log "║  Au premier démarrage:                            ║"
+log "║  1. WiFi-Connect apparaîtra si pas de réseau     ║"
+log "║  2. Runtipi s'installera automatiquement         ║"
+log "║  3. L'accès web sera disponible après ~5-10 min  ║"
+log "║                                                    ║"
+log "╚════════════════════════════════════════════════════╝"
+log ""
+
+log "✓ Installation terminée avec succès !"

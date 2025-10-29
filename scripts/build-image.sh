@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# RuntipiOS Image Builder - Version complète avec QEMU et correction OUTPUT_NAME
+# RuntipiOS Image Builder - Version corrigée Pi 5
 # Pour GitHub Actions (x86-64 avec support ARM64 via QEMU)
 
 # Couleurs pour les logs
@@ -168,17 +168,20 @@ else
     log_warning "Image déjà extraite, réutilisation"
 fi
 
-# Agrandir l'image
+# ============================================================================
+# AGRANDISSEMENT DE L'IMAGE - MÉTHODE COMPATIBLE PI 5
+# ============================================================================
+# Pi 5 ne supporte pas le redimensionnement avec sfdisk
+# On augmente simplement la taille du fichier image
+# Le redimensionnement du filesystem se fera au premier boot
+# ============================================================================
 log_info "Agrandissement de l'image à ${CONFIG_build_image_size}GB..."
 CURRENT_SIZE=$(stat -L -c%s "$BASE_IMAGE")
 TARGET_SIZE=$((CONFIG_build_image_size * 1024 * 1024 * 1024))
 
 if [ $TARGET_SIZE -gt $CURRENT_SIZE ]; then
     truncate -s ${TARGET_SIZE} "$BASE_IMAGE"
-    
-    # Redimensionner la partition
-    echo ", +" | sfdisk -N 2 "$BASE_IMAGE" 2>/dev/null || true
-    log_success "Image agrandie"
+    log_success "Image agrandie (le filesystem sera redimensionné au premier boot)"
 fi
 
 # Monter l'image
@@ -244,8 +247,10 @@ fi
 
 log_success "Partitions trouvées et vérifiées"
 
-# Redimensionner le système de fichiers root
-log_info "Redimensionnement du système de fichiers..."
+# ============================================================================
+# REDIMENSIONNER LE FILESYSTEM ROOT EXISTANT
+# ============================================================================
+log_info "Redimensionnement du système de fichiers root..."
 e2fsck -f -y "$ROOT_PART" || true
 resize2fs "$ROOT_PART"
 
@@ -270,12 +275,117 @@ if [ "$CURRENT_ARCH" = "x86_64" ] && [ "$TARGET_ARCH" = "arm64" ]; then
     cp /usr/bin/qemu-aarch64-static "${MOUNT_DIR}/usr/bin/" 2>/dev/null || log_warning "QEMU copy failed"
 fi
 
+# ============================================================================
+# CRÉER LE SCRIPT DE REDIMENSIONNEMENT POUR PI 5
+# ============================================================================
+log_info "Création du script de redimensionnement pour Pi 5..."
+cat > "${MOUNT_DIR}/usr/local/bin/expand-rootfs.sh" << 'EXPANDEOF'
+#!/bin/bash
+# Script de redimensionnement du filesystem root pour Pi 5
+# À exécuter au premier boot
+
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a /var/log/expand-rootfs.log
+}
+
+log "======================================"
+log "Redimensionnement du filesystem root"
+log "======================================"
+
+# Vérifier si déjà exécuté
+if [ -f /etc/expand-rootfs-done ]; then
+    log "Redimensionnement déjà effectué, abandon"
+    exit 0
+fi
+
+# Attendre que le système soit prêt
+sleep 5
+
+# Trouver la partition root
+ROOT_PART=$(mount | grep -E "/ type " | awk '{print $1}' | head -1)
+log "Partition root: $ROOT_PART"
+
+if [ -z "$ROOT_PART" ]; then
+    log "Erreur: partition root introuvable"
+    exit 1
+fi
+
+# Redimensionner la table de partition
+log "Redimensionnement de la table de partition..."
+DEVICE=$(echo $ROOT_PART | sed 's/[0-9]*$//')
+PART_NUM=$(echo $ROOT_PART | sed 's/[^0-9]*//g' | tail -c 2)
+
+# Utiliser parted au lieu de sfdisk (plus compatible Pi 5)
+if command -v parted &> /dev/null; then
+    parted -s "$DEVICE" resizepart "$PART_NUM" 100% || log "parted resizepart failed"
+else
+    log "parted non disponible, utilisation de fdisk"
+    # Alternative avec fdisk
+    echo "d
+$PART_NUM
+n
+p
+$PART_NUM
+
+
+t
+$PART_NUM
+83
+w
+" | fdisk "$DEVICE" 2>&1 | grep -v "^WARNING"
+fi
+
+log "Redimensionnement du filesystem ext4..."
+# Attendre que les changements soient appliqués
+sleep 2
+
+# Redimensionner le filesystem
+resize2fs "$ROOT_PART"
+
+log "✓ Redimensionnement terminé"
+touch /etc/expand-rootfs-done
+
+log "======================================"
+log "Redémarrage pour appliquer les changements..."
+sleep 2
+reboot
+EXPANDEOF
+
+chmod +x "${MOUNT_DIR}/usr/local/bin/expand-rootfs.sh"
+log_success "Script de redimensionnement créé"
+
+# ============================================================================
+# CRÉER LE SERVICE SYSTEMD POUR EXÉCUTER LE REDIMENSIONNEMENT
+# ============================================================================
+log_info "Création du service systemd pour redimensionnement..."
+cat > "${MOUNT_DIR}/etc/systemd/system/expand-rootfs.service" << 'SERVICEEOF'
+[Unit]
+Description=Expand Root Filesystem
+After=multi-user.target
+ConditionPathExists=!/etc/expand-rootfs-done
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/expand-rootfs.sh
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+SERVICEEOF
+
+log_success "Service systemd créé"
+
 # Monter les pseudo-filesystems pour chroot
 log_info "Préparation du chroot..."
 mount -t proc proc "${MOUNT_DIR}/proc"
 mount -t sysfs sys "${MOUNT_DIR}/sys"
 mount -o bind /dev "${MOUNT_DIR}/dev"
 mount -t devpts devpts "${MOUNT_DIR}/dev/pts"
+
+# Activer le service dans le chroot
+chroot "$MOUNT_DIR" systemctl enable expand-rootfs.service 2>/dev/null || log_warning "systemctl enable failed in chroot"
 
 # Copier les scripts dans le chroot
 log_info "Copie des scripts de configuration..."
@@ -418,5 +528,4 @@ echo "Pour flasher l'image sur une carte SD:"
 echo "  - Utilisez Raspberry Pi Imager: https://www.raspberrypi.com/software/"
 echo "  - Ou Etcher: https://www.balena.io/etcher/"
 echo ""
-log_info "N'oubliez pas de changer le mot de passe par défaut après le premier démarrage !"
-
+log_info "Au premier démarrage, le filesystem sera automatiquement redimensionné (redémarrage automatique)"

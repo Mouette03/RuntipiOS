@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script d'installation de Balena WiFi-Connect - VERSION CORRIGÉE
+# Script d'installation de Balena WiFi-Connect
 # Avec dépendances strictes et délais systemd
 
 set -e
@@ -9,7 +9,7 @@ log() {
 }
 
 log "======================================"
-log "Installation de WiFi-Connect (VERSION CORRIGÉE)"
+log "Installation de WiFi-Connect"
 log "======================================"
 
 # Charger la configuration
@@ -760,7 +760,7 @@ cat > /usr/local/bin/wifi-connect-check.sh << 'EOF'
 set -e
 
 log() {
-    echo "[$(date)] $1" | tee -a /var/log/wifi-connect-check.log
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a /var/log/wifi-connect-check.log
 }
 
 log "Vérification connectivité"
@@ -780,17 +780,28 @@ done
 
 sleep 5
 
-if ip link show eth0 2>/dev/null | grep -q "state UP"; then
-    touch /etc/runtipi-configured
-    exit 0
-fi
+# CORRECTION : Vérifier que Ethernet ou WiFi a une IP (pas juste "UP")
+log "Vérification réseau..."
+for i in {1..30}; do
+    # Vérifier Ethernet
+    if ip addr show eth0 2>/dev/null | grep -q "inet "; then
+        log "✓ Ethernet configuré"
+        touch /etc/runtipi-configured
+        exit 0
+    fi
 
-if nmcli -t -f GENERAL.STATE dev show wlan0 2>/dev/null | grep -q "100"; then
-    touch /etc/runtipi-configured
-    exit 0
-fi
+    # Vérifier WiFi
+    if ip addr show wlan0 2>/dev/null | grep -q "inet "; then
+        log "✓ WiFi configuré"
+        touch /etc/runtipi-configured
+        exit 0
+    fi
 
-log "Lancement WiFi-Connect"
+    sleep 1
+done
+
+# Pas de réseau, lancer WiFi-Connect
+log "Aucun réseau détecté, lancement WiFi-Connect"
 rfkill unblock wifi 2>/dev/null || true
 rfkill unblock wlan 2>/dev/null || true
 
@@ -800,7 +811,35 @@ exec /usr/local/bin/wifi-connect \
     --ui-directory /usr/local/share/wifi-connect/ui
 EOF
 
+
 chmod +x /usr/local/bin/wifi-connect-check.sh
+
+log "Création du script d'installation Runtipi..."
+
+cat > /usr/local/bin/install-runtipi.sh << 'RUNTIPIEOF'
+#!/bin/bash
+set -e
+
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a /var/log/runtipi-installer.log
+}
+
+log "=== Installation Runtipi ==="
+
+mkdir -p /home/runtipi
+cd /home/runtipi
+
+log "Lancement du script officiel Runtipi..."
+curl -L https://setup.runtipi.io | bash
+
+touch /etc/runtipi-configured
+
+log "✓ Installation Runtipi terminée !"
+RUNTIPIEOF
+
+chmod +x /usr/local/bin/install-runtipi.sh
+
+log "✓ Script d'installation Runtipi créé"
 
 log "✓ Script vérification créé"
 

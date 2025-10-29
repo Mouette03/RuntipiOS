@@ -45,22 +45,22 @@ cleanup() {
     set +e
     log_info "Nettoyage en cours..."
     sync
-    
+
     # Démonter les pseudo-filesystems du chroot
     umount "${MOUNT_DIR}/dev/pts" 2>/dev/null || true
     umount "${MOUNT_DIR}/dev" 2>/dev/null || true
     umount "${MOUNT_DIR}/sys" 2>/dev/null || true
     umount "${MOUNT_DIR}/proc" 2>/dev/null || true
-    
+
     # Démonter les partitions
     umount "${MOUNT_DIR}/boot/firmware" 2>/dev/null || true
     umount "${MOUNT_DIR}" 2>/dev/null || true
-    
+
     # Nettoyer kpartx si utilisé
     if [ "${USE_KPARTX}" = "1" ] && [ -n "${BASE_IMAGE}" ] && [ -f "${BASE_IMAGE}" ]; then
         kpartx -d "${BASE_IMAGE}" 2>/dev/null || true
     fi
-    
+
     # Détacher le loop device
     if [ -n "${LOOP_DEVICE}" ]; then
         losetup -d "${LOOP_DEVICE}" 2>/dev/null || true
@@ -125,19 +125,19 @@ log_info "Architecture cible: $TARGET_ARCH"
 # Si on est en x86-64 et cible ARM, activer QEMU
 if [ "$CURRENT_ARCH" = "x86_64" ] && [ "$TARGET_ARCH" = "arm64" ]; then
     log_info "Activation de QEMU pour support ARM64..."
-    
+
     # Enregistrer les formats binaires
     if command -v update-binfmts &> /dev/null; then
         update-binfmts --enable qemu-aarch64 2>/dev/null || log_warning "update-binfmts warning (non-critique)"
     fi
-    
+
     # Vérifier que QEMU est disponible
     if ! command -v qemu-aarch64-static &> /dev/null; then
         log_error "qemu-aarch64-static non trouvé!"
         log_error "Vérifiez que le Dockerfile installe qemu-user-static"
         exit 1
     fi
-    
+
     log_success "QEMU ARM64 activé"
 fi
 
@@ -159,7 +159,7 @@ if [ ! -f "$BASE_IMAGE" ]; then
     else
         log_warning "Archive déjà téléchargée, réutilisation"
     fi
-    
+
     # Extraire l'image
     log_info "Extraction de l'image..."
     xz -d -k "$BASE_IMAGE_XZ"
@@ -171,9 +171,8 @@ fi
 # ============================================================================
 # AGRANDISSEMENT DE L'IMAGE - MÉTHODE COMPATIBLE PI 5
 # ============================================================================
-# Pi 5 ne supporte pas le redimensionnement avec sfdisk
-# On augmente simplement la taille du fichier image
-# Le redimensionnement du filesystem se fera au premier boot
+# On augmente uniquement la taille du fichier image, PAS de modification de partitions ici
+# Le redimensionnement du filesystem se fera au premier boot via systemd
 # ============================================================================
 log_info "Agrandissement de l'image à ${CONFIG_build_image_size}GB..."
 CURRENT_SIZE=$(stat -L -c%s "$BASE_IMAGE")
@@ -200,15 +199,15 @@ if [ -e "${LOOP_DEVICE}p1" ] && [ -e "${LOOP_DEVICE}p2" ]; then
     USE_KPARTX=0
 else
     log_warning "Partitions non détectées, utilisation de kpartx..."
-    
+
     # Utiliser kpartx et capturer la sortie
     KPARTX_OUTPUT=$(kpartx -av "$BASE_IMAGE")
     sleep 3
-    
+
     # Utiliser awk avec exit pour n'extraire QUE la première ligne qui match
     BOOT_MAPPER=$(echo "$KPARTX_OUTPUT" | awk '/^add map.*p1 / {print $3; exit}')
     ROOT_MAPPER=$(echo "$KPARTX_OUTPUT" | awk '/^add map.*p2 / {print $3; exit}')
-    
+
     # Vérifier que les variables ne sont pas vides
     if [ -z "$BOOT_MAPPER" ] || [ -z "$ROOT_MAPPER" ]; then
         log_error "Impossible d'extraire les noms des mappers depuis kpartx"
@@ -216,11 +215,11 @@ else
         echo "$KPARTX_OUTPUT"
         exit 1
     fi
-    
+
     BOOT_PART="/dev/mapper/${BOOT_MAPPER}"
     ROOT_PART="/dev/mapper/${ROOT_MAPPER}"
     USE_KPARTX=1
-    
+
     log_info "Devices kpartx créés:"
     log_info "  Boot: ${BOOT_MAPPER} -> ${BOOT_PART}"
     log_info "  Root: ${ROOT_MAPPER} -> ${ROOT_PART}"
@@ -247,12 +246,8 @@ fi
 
 log_success "Partitions trouvées et vérifiées"
 
-# ============================================================================
-# REDIMENSIONNER LE FILESYSTEM ROOT EXISTANT
-# ============================================================================
-log_info "Redimensionnement du système de fichiers root..."
-e2fsck -f -y "$ROOT_PART" || true
-resize2fs "$ROOT_PART"
+# NE PAS redimensionner le filesystem root ici (Pi 4/5 safe)
+# On montera directement et on laissera systemd faire l'expansion au premier boot
 
 # Monter les partitions
 log_info "Montage des partitions..."
@@ -276,77 +271,62 @@ if [ "$CURRENT_ARCH" = "x86_64" ] && [ "$TARGET_ARCH" = "arm64" ]; then
 fi
 
 # ============================================================================
-# CRÉER LE SCRIPT DE REDIMENSIONNEMENT POUR PI 5
+# CRÉER LE SCRIPT DE REDIMENSIONNEMENT POUR PI 4/5 (au premier boot)
 # ============================================================================
-log_info "Création du script de redimensionnement pour Pi 5..."
+log_info "Création du script de redimensionnement pour premier boot..."
 cat > "${MOUNT_DIR}/usr/local/bin/expand-rootfs.sh" << 'EXPANDEOF'
 #!/bin/bash
-# Script de redimensionnement du filesystem root pour Pi 5
-# À exécuter au premier boot
+set -e
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a /var/log/expand-rootfs.log
 }
 
 log "======================================"
-log "Redimensionnement du filesystem root"
+log "Redimensionnement du filesystem root (premier boot)"
 log "======================================"
 
-# Vérifier si déjà exécuté
+# Déjà fait ?
 if [ -f /etc/expand-rootfs-done ]; then
-    log "Redimensionnement déjà effectué, abandon"
+    log "Déjà effectué, sortie"
     exit 0
 fi
 
-# Attendre que le système soit prêt
 sleep 5
 
-# Trouver la partition root
-ROOT_PART=$(mount | grep -E "/ type " | awk '{print $1}' | head -1)
+# Détecter root
+ROOT_PART=$(findmnt -n -o SOURCE / || true)
+if [ -z "$ROOT_PART" ]; then
+    ROOT_PART=$(mount | awk '$3=="/"{print $1; exit}')
+fi
 log "Partition root: $ROOT_PART"
 
 if [ -z "$ROOT_PART" ]; then
-    log "Erreur: partition root introuvable"
+    log "ERREUR: partition root introuvable"
     exit 1
 fi
 
-# Redimensionner la table de partition
-log "Redimensionnement de la table de partition..."
 DEVICE=$(echo $ROOT_PART | sed 's/[0-9]*$//')
 PART_NUM=$(echo $ROOT_PART | sed 's/[^0-9]*//g' | tail -c 2)
 
-# Utiliser parted au lieu de sfdisk (plus compatible Pi 5)
-if command -v parted &> /dev/null; then
-    parted -s "$DEVICE" resizepart "$PART_NUM" 100% || log "parted resizepart failed"
+log "Device: $DEVICE  Part#: $PART_NUM"
+
+# Étendre la partition (PAS la boot)
+if command -v parted &>/dev/null; then
+    log "Resize de la partition via parted..."
+    parted -s "$DEVICE" resizepart "$PART_NUM" 100% || log "parted resizepart a retourné une erreur non fatale"
 else
-    log "parted non disponible, utilisation de fdisk"
-    # Alternative avec fdisk
-    echo "d
-$PART_NUM
-n
-p
-$PART_NUM
-
-
-t
-$PART_NUM
-83
-w
-" | fdisk "$DEVICE" 2>&1 | grep -v "^WARNING"
+    log "parted indisponible, tentative sans changement de table"
 fi
 
-log "Redimensionnement du filesystem ext4..."
-# Attendre que les changements soient appliqués
-sleep 2
-
-# Redimensionner le filesystem
+# Vérifier et étendre ext4
+log "e2fsck..."
+e2fsck -f -y "$ROOT_PART" || true
+log "resize2fs..."
 resize2fs "$ROOT_PART"
 
-log "✓ Redimensionnement terminé"
 touch /etc/expand-rootfs-done
-
-log "======================================"
-log "Redémarrage pour appliquer les changements..."
+log "Terminé. Redémarrage..."
 sleep 2
 reboot
 EXPANDEOF
@@ -354,13 +334,11 @@ EXPANDEOF
 chmod +x "${MOUNT_DIR}/usr/local/bin/expand-rootfs.sh"
 log_success "Script de redimensionnement créé"
 
-# ============================================================================
-# CRÉER LE SERVICE SYSTEMD POUR EXÉCUTER LE REDIMENSIONNEMENT
-# ============================================================================
-log_info "Création du service systemd pour redimensionnement..."
+# Service systemd pour exécuter le script au premier boot
+log_info "Création du service systemd..."
 cat > "${MOUNT_DIR}/etc/systemd/system/expand-rootfs.service" << 'SERVICEEOF'
 [Unit]
-Description=Expand Root Filesystem
+Description=Expand Root Filesystem on First Boot
 After=multi-user.target
 ConditionPathExists=!/etc/expand-rootfs-done
 
@@ -375,9 +353,7 @@ StandardError=journal
 WantedBy=multi-user.target
 SERVICEEOF
 
-log_success "Service systemd créé"
-
-# Monter les pseudo-filesystems pour chroot
+# Préparer le chroot
 log_info "Préparation du chroot..."
 mount -t proc proc "${MOUNT_DIR}/proc"
 mount -t sysfs sys "${MOUNT_DIR}/sys"
@@ -453,7 +429,7 @@ log_success "Image copiée vers $FINAL_IMAGE"
 
 if [ "${CONFIG_build_compress}" = "true" ]; then
     log_info "Compression de l'image (cela peut prendre plusieurs minutes)..."
-    
+
     case "${CONFIG_build_compression_format}" in
         xz)
             xz -9 -T0 "$FINAL_IMAGE"
@@ -472,7 +448,7 @@ if [ "${CONFIG_build_compress}" = "true" ]; then
             log_warning "Format de compression inconnu: ${CONFIG_build_compression_format}"
             ;;
     esac
-    
+
     log_success "Image compressée: $(basename $FINAL_IMAGE)"
 fi
 
@@ -502,7 +478,7 @@ if [ "${CONFIG_build_compress}" = "true" ]; then
             rm -f "${OUTPUT_DIR}/${OUTPUT_NAME}.img.gz" 2>/dev/null || true
             ;;
     esac
-    
+
     # Supprimer l'image brute si elle existe (on a la version compressée)
     rm -f "${OUTPUT_DIR}/${OUTPUT_NAME}.img" 2>/dev/null || true
     log_info "Formats non utilisés supprimés"

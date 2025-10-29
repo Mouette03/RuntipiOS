@@ -1,5 +1,6 @@
 #!/bin/bash
-# Script d'installation de Balena WiFi-Connect avec interface personnalisée + Sélecteur de Pays
+# Script d'installation de Balena WiFi-Connect - VERSION CORRIGÉE
+# Avec dépendances strictes et délais systemd
 
 set -e
 
@@ -8,7 +9,7 @@ log() {
 }
 
 log "======================================"
-log "Installation de WiFi-Connect avec UI personnalisée + Pays"
+log "Installation de WiFi-Connect (VERSION CORRIGÉE)"
 log "======================================"
 
 # Charger la configuration
@@ -30,6 +31,13 @@ log "Version: ${WIFI_CONNECT_VERSION}"
 log "SSID: ${WIFI_CONNECT_SSID}"
 log "Architecture: ${ARCH}"
 
+# ============================================================================
+# INSTALLER LES DÉPENDANCES REQUISES
+# ============================================================================
+log "Installation des dépendances (jq, dnsmasq, etc.)..."
+apt-get update
+apt-get install -y jq dnsmasq
+
 # Télécharger WiFi-Connect
 log "Téléchargement de WiFi-Connect..."
 DOWNLOAD_URL="https://github.com/balena-os/wifi-connect/releases/download/v${WIFI_CONNECT_VERSION}/wifi-connect-v${WIFI_CONNECT_VERSION}-linux-${ARCH}.tar.gz"
@@ -45,7 +53,7 @@ chmod +x /usr/local/bin/wifi-connect
 mkdir -p /usr/local/share/wifi-connect/ui
 
 # Créer l'interface HTML personnalisée AVEC SÉLECTEUR DE PAYS
-log "Création de l'interface web personnalisée avec sélecteur de pays..."
+log "Création de l'interface web personnalisée..."
 cat > /usr/local/share/wifi-connect/ui/index.html << 'HTMLEOF'
 <!DOCTYPE html>
 <html lang="en">
@@ -537,18 +545,10 @@ cat > /usr/local/share/wifi-connect/ui/index.html << 'HTMLEOF'
             document.querySelectorAll('.lang-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.lang === lang);
             });
-            
-            // Traduire tous les éléments
             Object.keys(translations[lang]).forEach(key => {
                 const element = document.getElementById(key);
                 if (element) {
-                    if (element.tagName === 'INPUT' || element.tagName === 'BUTTON') {
-                        if (element.placeholder) element.placeholder = translations[lang][key];
-                        if (element.value && key.includes('btn')) element.textContent = translations[lang][key];
-                        if (element.textContent && !element.value) element.textContent = translations[lang][key];
-                    } else {
-                        element.textContent = translations[lang][key];
-                    }
+                    element.textContent = translations[lang][key];
                 }
             });
         }
@@ -559,44 +559,26 @@ cat > /usr/local/share/wifi-connect/ui/index.html << 'HTMLEOF'
         }
         
         function nextStep() {
-            // Validation
             if (currentStep === 1) {
-                const username = document.getElementById('ssh_username').value;
                 const password = document.getElementById('ssh_password').value;
                 const confirm = document.getElementById('ssh_password_confirm').value;
-                
-                if (password.length < 8) {
+                if (password.length < 8 || password !== confirm) {
                     alert(translations[currentLang]['error-password-length']);
                     return;
                 }
-                
-                if (password !== confirm) {
-                    alert(translations[currentLang]['error-passwords']);
-                    return;
-                }
             }
-            
             if (currentStep === 2) {
                 const ssid = document.getElementById('ssid').value;
                 if (!ssid) {
                     alert(translations[currentLang]['error-ssid']);
                     return;
                 }
-                
-                // Remplir le résumé
-                document.getElementById('review_ssh_username').textContent = 
-                    document.getElementById('ssh_username').value;
-                
+                document.getElementById('review_ssh_username').textContent = document.getElementById('ssh_username').value;
                 const countrySelect = document.getElementById('wifi_country');
-                document.getElementById('review_wifi_country').textContent = 
-                    countrySelect.options[countrySelect.selectedIndex].text;
-                
+                document.getElementById('review_wifi_country').textContent = countrySelect.options[countrySelect.selectedIndex].text;
                 document.getElementById('review_ssid').textContent = ssid;
-                const wifiPass = document.getElementById('wifi_password').value;
-                document.getElementById('review_wifi_password').textContent = 
-                    wifiPass ? '••••••••' : '(Open network)';
+                document.getElementById('review_wifi_password').textContent = document.getElementById('wifi_password').value ? '••••••••' : '(Open)';
             }
-            
             currentStep++;
             updateSteps();
         }
@@ -610,7 +592,6 @@ cat > /usr/local/share/wifi-connect/ui/index.html << 'HTMLEOF'
             document.querySelectorAll('.step').forEach((step, index) => {
                 step.classList.toggle('active', index + 1 === currentStep);
             });
-            
             document.querySelectorAll('.step-dot').forEach((dot, index) => {
                 dot.classList.toggle('active', index + 1 === currentStep);
             });
@@ -618,17 +599,10 @@ cat > /usr/local/share/wifi-connect/ui/index.html << 'HTMLEOF'
         
         async function scanNetworks() {
             const select = document.getElementById('ssid');
-            const btn = document.getElementById('btn-scan');
-            btn.disabled = true;
-            btn.textContent = '⏳ ' + (currentLang === 'en' ? 'Scanning...' : 'Scan en cours...');
-            
             try {
                 const response = await fetch('/networks');
                 const networks = await response.json();
-                
-                select.innerHTML = '<option value="">' + 
-                    translations[currentLang]['option-select'] + '</option>';
-                
+                select.innerHTML = '<option value="">Select...</option>';
                 networks.forEach(network => {
                     const option = document.createElement('option');
                     option.value = network.ssid;
@@ -638,9 +612,6 @@ cat > /usr/local/share/wifi-connect/ui/index.html << 'HTMLEOF'
             } catch (error) {
                 console.error('Error scanning networks:', error);
             }
-            
-            btn.disabled = false;
-            btn.textContent = translations[currentLang]['btn-scan'];
         }
         
         document.getElementById('setupForm').addEventListener('submit', async (e) => {
@@ -664,193 +635,165 @@ cat > /usr/local/share/wifi-connect/ui/index.html << 'HTMLEOF'
                 });
                 
                 if (response.ok) {
-                    document.querySelector('[data-step="4"]').innerHTML = `
-                        <div class="success">
-                            <h3>${translations[currentLang]['success-title']}</h3>
-                            <p>${translations[currentLang]['success-text']}</p>
-                            <p style="margin-top: 15px;">
-                                <strong>http://runtipios.local</strong><br>
-                                ssh ${data.ssh_username}@runtipios.local
-                            </p>
-                        </div>
-                    `;
-                } else {
-                    throw new Error('Connection failed');
+                    document.querySelector('[data-step="4"]').innerHTML = `<div class="success"><h3>${translations[currentLang]['success-title']}</h3><p>${translations[currentLang]['success-text']}</p><p style="margin-top: 15px;"><strong>http://runtipios.local</strong></p></div>`;
                 }
             } catch (error) {
-                document.querySelector('[data-step="4"]').innerHTML = `
-                    <div class="error">
-                        <h3>Error</h3>
-                        <p>${translations[currentLang]['error-network']}</p>
-                    </div>
-                    <button type="button" class="btn-primary" onclick="location.reload()" 
-                            style="width: 100%; margin-top: 20px;">
-                        ${currentLang === 'en' ? 'Try Again' : 'Réessayer'}
-                    </button>
-                `;
+                document.querySelector('[data-step="4"]').innerHTML = `<div class="error"><p>${translations[currentLang]['error-network']}</p></div>`;
             }
         });
         
-        // Scanner les réseaux au chargement
-        window.addEventListener('load', () => {
-            scanNetworks();
-        });
+        window.addEventListener('load', () => scanNetworks());
     </script>
 </body>
 </html>
 HTMLEOF
 
-log "✓ Interface HTML avec sélecteur de pays créée"
+log "✓ Interface HTML créée"
 
-# Créer le script de traitement du backend AVEC PAYS
+# Créer le backend CORRIGÉ avec attente NetworkManager
 cat > /usr/local/bin/wifi-connect-backend.sh << 'BACKENDEOF'
 #!/bin/bash
-# Backend pour traiter la configuration WiFi-Connect + Pays WiFi
+set -e
+
+log() {
+    echo "[$(date)] $1" | tee -a /var/log/wifi-connect-backend.log
+}
 
 CONFIG_FILE="/tmp/wifi-connect-config.json"
 
-# Lire la configuration envoyée
-read_config() {
-    if [ -f "$CONFIG_FILE" ]; then
-        cat "$CONFIG_FILE"
-    fi
-}
-
-# Appliquer la configuration du pays WiFi
 apply_wifi_country() {
     local country=$1
+    log "Configuration du pays WiFi: $country"
     
-    echo "[$(date)] Configuration du pays WiFi: $country"
-    
-    # Méthode 1: raspi-config
     if command -v raspi-config &>/dev/null; then
-        raspi-config nonint do_wifi_country "$country" || echo "raspi-config failed"
+        raspi-config nonint do_wifi_country "$country" 2>&1 || true
     fi
     
-    # Méthode 2: wpa_supplicant
-    if [ -f /etc/wpa_supplicant/wpa_supplicant.conf ]; then
-        sed -i "s/^country=.*/country=$country/" /etc/wpa_supplicant/wpa_supplicant.conf || \
+    mkdir -p /etc/wpa_supplicant
+    if grep -q "^country=" /etc/wpa_supplicant/wpa_supplicant.conf 2>/dev/null; then
+        sed -i "s/^country=.*/country=$country/" /etc/wpa_supplicant/wpa_supplicant.conf
+    else
         echo "country=$country" >> /etc/wpa_supplicant/wpa_supplicant.conf
     fi
     
-    # Méthode 3: config.txt
     if [ -f /boot/firmware/config.txt ]; then
         sed -i '/^country=/d' /boot/firmware/config.txt
         echo "country=$country" >> /boot/firmware/config.txt
     fi
     
-    # Débloquer rfkill
     rfkill unblock wifi 2>/dev/null || true
     rfkill unblock wlan 2>/dev/null || true
     
-    echo "[$(date)] Pays WiFi configuré: $country"
+    log "✓ Pays WiFi: $country"
 }
 
-# Appliquer la configuration SSH
 apply_ssh_config() {
     local username=$1
     local password=$2
     
-    echo "[$(date)] Configuration SSH pour $username"
+    log "Configuration SSH: $username"
     
-    # Créer l'utilisateur s'il n'existe pas
     if ! id "$username" &>/dev/null; then
         useradd -m -s /bin/bash -G sudo,netdev "$username"
     fi
     
-    # Définir le mot de passe
     echo "$username:$password" | chpasswd
-    
-    # Configurer les permissions SSH
     mkdir -p /home/$username/.ssh
     chmod 700 /home/$username/.ssh
     chown -R $username:$username /home/$username/.ssh
     
-    echo "[$(date)] Configuration SSH terminée"
+    log "✓ SSH configuré"
 }
 
-# Appliquer la configuration WiFi
 apply_wifi_config() {
     local ssid=$1
     local password=$2
     
-    echo "[$(date)] Connexion au WiFi: $ssid"
+    log "Connexion WiFi: $ssid"
     
-    # Utiliser nmcli pour configurer le WiFi
+    for i in {1..30}; do
+        if systemctl is-active NetworkManager &>/dev/null; then
+            break
+        fi
+        sleep 1
+    done
+    
     if [ -n "$password" ]; then
-        nmcli device wifi connect "$ssid" password "$password"
+        nmcli device wifi connect "$ssid" password "$password" 2>&1 || true
     else
-        nmcli device wifi connect "$ssid"
+        nmcli device wifi connect "$ssid" 2>&1 || true
     fi
     
-    echo "[$(date)] WiFi configuré"
+    log "✓ WiFi configuré"
 }
 
-# Point d'entrée principal
-if [ "$1" = "apply" ]; then
-    CONFIG=$(read_config)
+if [ "$1" = "apply" ] && [ -f "$CONFIG_FILE" ]; then
+    CONFIG=$(cat "$CONFIG_FILE")
     
-    SSH_USERNAME=$(echo "$CONFIG" | jq -r '.ssh_username')
+    SSH_USERNAME=$(echo "$CONFIG" | jq -r '.ssh_username // "runtipi"')
     SSH_PASSWORD=$(echo "$CONFIG" | jq -r '.ssh_password')
-    WIFI_COUNTRY=$(echo "$CONFIG" | jq -r '.wifi_country')
+    WIFI_COUNTRY=$(echo "$CONFIG" | jq -r '.wifi_country // "FR"')
     SSID=$(echo "$CONFIG" | jq -r '.ssid')
-    WIFI_PASSWORD=$(echo "$CONFIG" | jq -r '.password')
+    WIFI_PASSWORD=$(echo "$CONFIG" | jq -r '.password // ""')
     
-    echo "[$(date)] ======================================"
-    echo "[$(date)] Application de la configuration"
-    echo "[$(date)] ======================================"
+    log "Application de la configuration"
     
-    # Appliquer le pays WiFi EN PREMIER
     apply_wifi_country "$WIFI_COUNTRY"
-    
-    # Appliquer la configuration SSH
     apply_ssh_config "$SSH_USERNAME" "$SSH_PASSWORD"
-    
-    # Appliquer la configuration WiFi
     apply_wifi_config "$SSID" "$WIFI_PASSWORD"
     
-    # Marquer comme configuré
     touch /etc/runtipi-configured
     
-    echo "[$(date)] Configuration terminée, redémarrage..."
-    
-    # Redémarrer pour appliquer tous les changements
-    sleep 2
+    log "Redémarrage..."
+    sleep 3
     reboot
 fi
 BACKENDEOF
 
 chmod +x /usr/local/bin/wifi-connect-backend.sh
 
-log "✓ Backend script avec gestion pays créé"
+log "✓ Backend créé"
 
-# Créer le script de vérification de connectivité
-log "Création du script de vérification..."
+# Script de vérification amélioré
 cat > /usr/local/bin/wifi-connect-check.sh << 'EOF'
 #!/bin/bash
-# Script de vérification de la connectivité réseau
+set -e
 
-# Vérifier si le fichier de configuration réseau existe
+log() {
+    echo "[$(date)] $1" | tee -a /var/log/wifi-connect-check.log
+}
+
+log "Vérification connectivité"
+
 if [ -f /etc/runtipi-configured ]; then
-    # Système déjà configuré, ne pas lancer wifi-connect
     exit 0
 fi
 
-# Vérifier la connectivité Ethernet
+log "Attente NetworkManager..."
+for i in {1..60}; do
+    if systemctl is-active NetworkManager &>/dev/null; then
+        log "NetworkManager actif"
+        break
+    fi
+    sleep 1
+done
+
+sleep 5
+
 if ip link show eth0 2>/dev/null | grep -q "state UP"; then
-    # Ethernet connecté, marquer comme configuré et ne pas lancer wifi-connect
     touch /etc/runtipi-configured
     exit 0
 fi
 
-# Vérifier la connectivité WiFi
-if nmcli -t -f GENERAL.STATE dev show wlan0 2>/dev/null | grep -q "100 (connected)"; then
-    # WiFi connecté, marquer comme configuré et ne pas lancer wifi-connect
+if nmcli -t -f GENERAL.STATE dev show wlan0 2>/dev/null | grep -q "100"; then
     touch /etc/runtipi-configured
     exit 0
 fi
 
-# Pas de connectivité, lancer wifi-connect avec l'UI personnalisée
+log "Lancement WiFi-Connect"
+rfkill unblock wifi 2>/dev/null || true
+rfkill unblock wlan 2>/dev/null || true
+
 exec /usr/local/bin/wifi-connect \
     --portal-ssid "RuntipiOS-Setup" \
     --portal-interface wlan0 \
@@ -859,39 +802,41 @@ EOF
 
 chmod +x /usr/local/bin/wifi-connect-check.sh
 
-log "✓ Script de vérification créé"
+log "✓ Script vérification créé"
 
-# Créer le service systemd
+# Service systemd CORRIGÉ
 log "Configuration du service systemd..."
 cat > /etc/systemd/system/wifi-connect.service << 'EOF'
 [Unit]
-Description=Balena WiFi Connect with Custom UI and Country Selection
-After=NetworkManager.service unblock-rfkill.service
-Wants=NetworkManager.service
+Description=Balena WiFi Connect - Captive Portal
+After=NetworkManager.service network-online.target unblock-rfkill.service
+Wants=network-online.target
+Requires=NetworkManager.service
 Before=runtipi-installer.service
+ConditionPathExists=!/etc/runtipi-configured
 
 [Service]
 Type=simple
+ExecStartPre=/bin/sleep 15
 ExecStart=/usr/local/bin/wifi-connect-check.sh
 Restart=on-failure
-RestartSec=10
+RestartSec=20
 StandardOutput=journal
 StandardError=journal
+TimeoutStartSec=300
+KillMode=process
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-# Activer le service
 systemctl daemon-reload
 systemctl enable wifi-connect.service
 
-log "✓ Service WiFi-Connect configuré et activé"
+log "✓ Service configuré"
 
-# Nettoyer
 rm -f /tmp/wifi-connect.tar.gz
 
 log "======================================"
-log "Installation de WiFi-Connect terminée"
-log "Configuration avec sélecteur de pays"
+log "Installation terminée ✓"
 log "======================================"

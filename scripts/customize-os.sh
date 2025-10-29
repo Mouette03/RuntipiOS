@@ -182,7 +182,8 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
     rfkill \
     wireless-tools \
     wpasupplicant \
-    iw
+    iw \
+    jq
 
 log "✓ Paquets installés"
 

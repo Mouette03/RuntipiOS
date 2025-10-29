@@ -28,18 +28,21 @@ LOCALE=$(parse_config "locale")
 KEYBOARD=$(parse_config "keyboard_layout")
 DEFAULT_USER=$(parse_config "default_user")
 DEFAULT_PASSWORD=$(parse_config "default_password")
+WIFI_COUNTRY=$(parse_config "wifi_country")
 
 HOSTNAME=${HOSTNAME:-runtipios}
 TIMEZONE=${TIMEZONE:-Europe/Paris}
 LOCALE=${LOCALE:-fr_FR.UTF-8}
 DEFAULT_USER=${DEFAULT_USER:-runtipi}
 DEFAULT_PASSWORD=${DEFAULT_PASSWORD:-runtipi}
+WIFI_COUNTRY=${WIFI_COUNTRY:-FR}
 
 log "Configuration du système:"
 log "  - Hostname: $HOSTNAME"
 log "  - Timezone: $TIMEZONE"
 log "  - Locale: $LOCALE"
 log "  - User: $DEFAULT_USER"
+log "  - WiFi Country: $WIFI_COUNTRY"
 
 # Configurer le hostname
 log "Configuration du hostname..."
@@ -56,6 +59,96 @@ log "Configuration de la locale..."
 sed -i "s/^# *${LOCALE}/${LOCALE}/" /etc/locale.gen
 locale-gen
 update-locale LANG=$LOCALE
+
+# ============================================================================
+# DÉSACTIVER LE WIZARD DE PREMIÈRE INSTALLATION
+# ============================================================================
+log "Désactivation du wizard de première installation..."
+
+# Supprimer le script piwiz (wizard graphique)
+rm -f /etc/xdg/autostart/piwiz.desktop
+
+# Marquer la configuration initiale comme terminée
+touch /etc/pi-setup-complete
+
+# Désactiver userconf-pi (qui demande de renommer l'utilisateur)
+systemctl disable userconfig.service 2>/dev/null || true
+systemctl mask userconfig.service 2>/dev/null || true
+
+# Supprimer le fichier userconf qui déclenche le wizard
+rm -f /boot/firmware/userconf.txt
+rm -f /boot/firmware/userconf
+
+log "✓ Wizard de première installation désactivé"
+
+# ============================================================================
+# CONFIGURER LE PAYS WIFI (OBLIGATOIRE POUR DÉBLOQUER RFKILL)
+# ============================================================================
+log "Configuration du pays WiFi: $WIFI_COUNTRY..."
+
+# Méthode 1: Via raspi-config (non-interactif)
+if command -v raspi-config &>/dev/null; then
+    raspi-config nonint do_wifi_country "$WIFI_COUNTRY" || log "raspi-config wifi country failed (non-critique)"
+fi
+
+# Méthode 2: Configuration directe dans wpa_supplicant
+mkdir -p /etc/wpa_supplicant
+cat > /etc/wpa_supplicant/wpa_supplicant.conf << WPAEOF
+ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+update_config=1
+country=$WIFI_COUNTRY
+WPAEOF
+
+# Méthode 3: Configuration via rfkill et iw
+# Débloquer le WiFi
+rfkill unblock wifi 2>/dev/null || log "rfkill unblock wifi failed (non-critique)"
+rfkill unblock wlan 2>/dev/null || log "rfkill unblock wlan failed (non-critique)"
+
+# Méthode 4: Configuration via NetworkManager
+mkdir -p /etc/NetworkManager/conf.d
+cat > /etc/NetworkManager/conf.d/wifi-country.conf << NMEOF
+[device]
+wifi.scan-rand-mac-address=no
+
+[connection]
+wifi.powersave=2
+NMEOF
+
+# Méthode 5: Ajouter au fichier de configuration du kernel
+if [ -f /boot/firmware/config.txt ]; then
+    # Supprimer les anciennes configurations
+    sed -i '/^country=/d' /boot/firmware/config.txt
+    # Ajouter la nouvelle
+    echo "country=$WIFI_COUNTRY" >> /boot/firmware/config.txt
+fi
+
+log "✓ Pays WiFi configuré: $WIFI_COUNTRY"
+
+# ============================================================================
+# DÉBLOQUER RFKILL DE MANIÈRE PERMANENTE
+# ============================================================================
+log "Déblocage permanent de rfkill..."
+
+# Créer un service systemd pour débloquer rfkill au boot
+cat > /etc/systemd/system/unblock-rfkill.service << 'RFKILLEOF'
+[Unit]
+Description=Unblock WiFi rfkill
+After=network-pre.target
+Before=network.target wifi-connect.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/rfkill unblock wifi
+ExecStart=/usr/sbin/rfkill unblock wlan
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+RFKILLEOF
+
+systemctl enable unblock-rfkill.service
+
+log "✓ Service rfkill unblock créé et activé"
 
 # Mettre à jour les paquets
 log "Mise à jour des paquets..."
@@ -85,7 +178,11 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
     ca-certificates \
     gnupg \
     lsb-release \
-    openssh-server
+    openssh-server \
+    rfkill \
+    wireless-tools \
+    wpasupplicant \
+    iw
 
 log "✓ Paquets installés"
 
@@ -97,11 +194,13 @@ log "Note: Docker sera installé automatiquement par Runtipi au premier démarra
 # Créer l'utilisateur
 log "Création de l'utilisateur $DEFAULT_USER..."
 if ! id "$DEFAULT_USER" &>/dev/null; then
-    useradd -m -s /bin/bash -G sudo "$DEFAULT_USER"
+    useradd -m -s /bin/bash -G sudo,netdev "$DEFAULT_USER"
     echo "$DEFAULT_USER:$DEFAULT_PASSWORD" | chpasswd
     log "✓ Utilisateur créé"
 else
     log "Utilisateur déjà existant"
+    # Ajouter au groupe netdev si nécessaire
+    usermod -aG netdev "$DEFAULT_USER" 2>/dev/null || true
 fi
 
 # Configurer SSH
@@ -116,6 +215,31 @@ systemctl enable ssh
 # Configurer Avahi (mDNS)
 log "Configuration d'Avahi (mDNS)..."
 systemctl enable avahi-daemon
+
+# ============================================================================
+# CONFIGURER NETWORKMANAGER POUR WIFI-CONNECT
+# ============================================================================
+log "Configuration de NetworkManager..."
+
+# Désactiver la gestion automatique du WiFi par NM
+cat > /etc/NetworkManager/conf.d/99-wifi-connect.conf << 'NMWCEOF'
+[main]
+plugins=keyfile
+
+[keyfile]
+unmanaged-devices=
+
+[device]
+wifi.scan-rand-mac-address=no
+
+[connection]
+connection.autoconnect-slaves=-1
+NMWCEOF
+
+systemctl enable NetworkManager
+systemctl start NetworkManager 2>/dev/null || true
+
+log "✓ NetworkManager configuré"
 
 # ============================================================================
 # NETTOYAGE AGRESSIF POUR ÉCONOMISER DE L'ESPACE
@@ -308,6 +432,12 @@ log "✓ Customisation terminée"
 log "======================================"
 log ""
 log "✅ Le système est prêt!"
+log ""
+log "Configuration appliquée:"
+log "  ✓ Wizard de première installation désactivé"
+log "  ✓ Pays WiFi configuré: $WIFI_COUNTRY"
+log "  ✓ rfkill débloqué"
+log "  ✓ Utilisateur $DEFAULT_USER créé"
 log ""
 log "Prochaines étapes:"
 log "  1. Runtipi s'installera automatiquement au premier démarrage"

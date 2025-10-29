@@ -42,7 +42,8 @@ system:
   timezone: "Europe/Paris"
   locale: "fr_FR.UTF-8"
   keyboard_layout: "fr"
-  
+  wifi_country: "FR"
+
 # Utilisateur par défaut (sera remplacé par la config du portail captif)
 # Ces valeurs ne sont utilisées QUE si le portail captif n'est pas utilisé
   default_user: "runtipi"

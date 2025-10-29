@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script d'installation de Balena WiFi-Connect avec interface personnalisée
+# Script d'installation de Balena WiFi-Connect avec interface personnalisée + Sélecteur de Pays
 
 set -e
 
@@ -8,7 +8,7 @@ log() {
 }
 
 log "======================================"
-log "Installation de WiFi-Connect avec UI personnalisée"
+log "Installation de WiFi-Connect avec UI personnalisée + Pays"
 log "======================================"
 
 # Charger la configuration
@@ -44,8 +44,8 @@ chmod +x /usr/local/bin/wifi-connect
 # Créer le répertoire pour l'interface utilisateur personnalisée
 mkdir -p /usr/local/share/wifi-connect/ui
 
-# Créer l'interface HTML personnalisée
-log "Création de l'interface web personnalisée..."
+# Créer l'interface HTML personnalisée AVEC SÉLECTEUR DE PAYS
+log "Création de l'interface web personnalisée avec sélecteur de pays..."
 cat > /usr/local/share/wifi-connect/ui/index.html << 'HTMLEOF'
 <!DOCTYPE html>
 <html lang="en">
@@ -353,10 +353,43 @@ cat > /usr/local/share/wifi-connect/ui/index.html << 'HTMLEOF'
                 </div>
             </div>
             
-            <!-- Étape 2: Configuration WiFi -->
+            <!-- Étape 2: Configuration WiFi + PAYS -->
             <div class="step" data-step="2">
                 <div class="info-box">
-                    <p id="info-step2">Select your WiFi network and enter the password.</p>
+                    <p id="info-step2">Select your WiFi network, country, and enter the password.</p>
+                </div>
+                
+                <div class="form-group">
+                    <label for="wifi_country" id="label-wifi-country">WiFi Country / Regulatory Domain</label>
+                    <select id="wifi_country" name="wifi_country" required>
+                        <option value="FR" selected>🇫🇷 France (FR)</option>
+                        <option value="US">🇺🇸 United States (US)</option>
+                        <option value="GB">🇬🇧 United Kingdom (GB)</option>
+                        <option value="DE">🇩🇪 Germany (DE)</option>
+                        <option value="ES">🇪🇸 Spain (ES)</option>
+                        <option value="IT">🇮🇹 Italy (IT)</option>
+                        <option value="CA">🇨🇦 Canada (CA)</option>
+                        <option value="AU">🇦🇺 Australia (AU)</option>
+                        <option value="JP">🇯🇵 Japan (JP)</option>
+                        <option value="CN">🇨🇳 China (CN)</option>
+                        <option value="BR">🇧🇷 Brazil (BR)</option>
+                        <option value="IN">🇮🇳 India (IN)</option>
+                        <option value="RU">🇷🇺 Russia (RU)</option>
+                        <option value="NL">🇳🇱 Netherlands (NL)</option>
+                        <option value="BE">🇧🇪 Belgium (BE)</option>
+                        <option value="CH">🇨🇭 Switzerland (CH)</option>
+                        <option value="SE">🇸🇪 Sweden (SE)</option>
+                        <option value="NO">🇳🇴 Norway (NO)</option>
+                        <option value="DK">🇩🇰 Denmark (DK)</option>
+                        <option value="FI">🇫🇮 Finland (FI)</option>
+                        <option value="PL">🇵🇱 Poland (PL)</option>
+                        <option value="PT">🇵🇹 Portugal (PT)</option>
+                        <option value="AT">🇦🇹 Austria (AT)</option>
+                        <option value="IE">🇮🇪 Ireland (IE)</option>
+                        <option value="NZ">🇳🇿 New Zealand (NZ)</option>
+                        <option value="ZA">🇿🇦 South Africa (ZA)</option>
+                    </select>
+                    <small id="hint-wifi-country" style="color: #999;">Required for regulatory compliance</small>
                 </div>
                 
                 <div class="form-group">
@@ -396,6 +429,7 @@ cat > /usr/local/share/wifi-connect/ui/index.html << 'HTMLEOF'
                     <h3 id="review-title" style="margin-bottom: 15px; color: #667eea;">Configuration Summary</h3>
                     <p><strong id="review-ssh-user-label">SSH Username:</strong> <span id="review_ssh_username"></span></p>
                     <p><strong id="review-ssh-pass-label">SSH Password:</strong> ••••••••</p>
+                    <p><strong id="review-country-label">WiFi Country:</strong> <span id="review_wifi_country"></span></p>
                     <p><strong id="review-ssid-label">WiFi Network:</strong> <span id="review_ssid"></span></p>
                     <p><strong id="review-wifi-pass-label">WiFi Password:</strong> <span id="review_wifi_password"></span></p>
                 </div>
@@ -428,7 +462,9 @@ cat > /usr/local/share/wifi-connect/ui/index.html << 'HTMLEOF'
                 'hint-ssh-pass': "Minimum 8 characters",
                 'label-ssh-pass-confirm': "Confirm Password",
                 'btn-next-1': "Next",
-                'info-step2': "Select your WiFi network and enter the password.",
+                'info-step2': "Select your WiFi network, country, and enter the password.",
+                'label-wifi-country': "WiFi Country / Regulatory Domain",
+                'hint-wifi-country': "Required for regulatory compliance",
                 'label-ssid': "WiFi Network (SSID)",
                 'option-select': "Select a network...",
                 'btn-scan': "🔄 Scan networks",
@@ -440,6 +476,7 @@ cat > /usr/local/share/wifi-connect/ui/index.html << 'HTMLEOF'
                 'review-title': "Configuration Summary",
                 'review-ssh-user-label': "SSH Username:",
                 'review-ssh-pass-label': "SSH Password:",
+                'review-country-label': "WiFi Country:",
                 'review-ssid-label': "WiFi Network:",
                 'review-wifi-pass-label': "WiFi Password:",
                 'btn-prev-3': "Previous",
@@ -462,7 +499,9 @@ cat > /usr/local/share/wifi-connect/ui/index.html << 'HTMLEOF'
                 'hint-ssh-pass': "Minimum 8 caractères",
                 'label-ssh-pass-confirm': "Confirmer le mot de passe",
                 'btn-next-1': "Suivant",
-                'info-step2': "Sélectionnez votre réseau WiFi et entrez le mot de passe.",
+                'info-step2': "Sélectionnez votre pays, réseau WiFi et entrez le mot de passe.",
+                'label-wifi-country': "Pays WiFi / Domaine réglementaire",
+                'hint-wifi-country': "Requis pour la conformité réglementaire",
                 'label-ssid': "Réseau WiFi (SSID)",
                 'option-select': "Sélectionner un réseau...",
                 'btn-scan': "🔄 Scanner les réseaux",
@@ -474,6 +513,7 @@ cat > /usr/local/share/wifi-connect/ui/index.html << 'HTMLEOF'
                 'review-title': "Résumé de la configuration",
                 'review-ssh-user-label': "Utilisateur SSH :",
                 'review-ssh-pass-label': "Mot de passe SSH :",
+                'review-country-label': "Pays WiFi :",
                 'review-ssid-label': "Réseau WiFi :",
                 'review-wifi-pass-label': "Mot de passe WiFi :",
                 'btn-prev-3': "Précédent",
@@ -546,6 +586,11 @@ cat > /usr/local/share/wifi-connect/ui/index.html << 'HTMLEOF'
                 // Remplir le résumé
                 document.getElementById('review_ssh_username').textContent = 
                     document.getElementById('ssh_username').value;
+                
+                const countrySelect = document.getElementById('wifi_country');
+                document.getElementById('review_wifi_country').textContent = 
+                    countrySelect.options[countrySelect.selectedIndex].text;
+                
                 document.getElementById('review_ssid').textContent = ssid;
                 const wifiPass = document.getElementById('wifi_password').value;
                 document.getElementById('review_wifi_password').textContent = 
@@ -606,6 +651,7 @@ cat > /usr/local/share/wifi-connect/ui/index.html << 'HTMLEOF'
             const data = {
                 ssh_username: document.getElementById('ssh_username').value,
                 ssh_password: document.getElementById('ssh_password').value,
+                wifi_country: document.getElementById('wifi_country').value,
                 ssid: document.getElementById('ssid').value,
                 password: document.getElementById('wifi_password').value
             };
@@ -654,12 +700,12 @@ cat > /usr/local/share/wifi-connect/ui/index.html << 'HTMLEOF'
 </html>
 HTMLEOF
 
-log "✓ Interface HTML créée"
+log "✓ Interface HTML avec sélecteur de pays créée"
 
-# Créer le script de traitement du backend
+# Créer le script de traitement du backend AVEC PAYS
 cat > /usr/local/bin/wifi-connect-backend.sh << 'BACKENDEOF'
 #!/bin/bash
-# Backend pour traiter la configuration WiFi-Connect
+# Backend pour traiter la configuration WiFi-Connect + Pays WiFi
 
 CONFIG_FILE="/tmp/wifi-connect-config.json"
 
@@ -670,14 +716,46 @@ read_config() {
     fi
 }
 
+# Appliquer la configuration du pays WiFi
+apply_wifi_country() {
+    local country=$1
+    
+    echo "[$(date)] Configuration du pays WiFi: $country"
+    
+    # Méthode 1: raspi-config
+    if command -v raspi-config &>/dev/null; then
+        raspi-config nonint do_wifi_country "$country" || echo "raspi-config failed"
+    fi
+    
+    # Méthode 2: wpa_supplicant
+    if [ -f /etc/wpa_supplicant/wpa_supplicant.conf ]; then
+        sed -i "s/^country=.*/country=$country/" /etc/wpa_supplicant/wpa_supplicant.conf || \
+        echo "country=$country" >> /etc/wpa_supplicant/wpa_supplicant.conf
+    fi
+    
+    # Méthode 3: config.txt
+    if [ -f /boot/firmware/config.txt ]; then
+        sed -i '/^country=/d' /boot/firmware/config.txt
+        echo "country=$country" >> /boot/firmware/config.txt
+    fi
+    
+    # Débloquer rfkill
+    rfkill unblock wifi 2>/dev/null || true
+    rfkill unblock wlan 2>/dev/null || true
+    
+    echo "[$(date)] Pays WiFi configuré: $country"
+}
+
 # Appliquer la configuration SSH
 apply_ssh_config() {
     local username=$1
     local password=$2
     
+    echo "[$(date)] Configuration SSH pour $username"
+    
     # Créer l'utilisateur s'il n'existe pas
     if ! id "$username" &>/dev/null; then
-        useradd -m -s /bin/bash -G sudo,docker "$username"
+        useradd -m -s /bin/bash -G sudo,netdev "$username"
     fi
     
     # Définir le mot de passe
@@ -687,6 +765,8 @@ apply_ssh_config() {
     mkdir -p /home/$username/.ssh
     chmod 700 /home/$username/.ssh
     chown -R $username:$username /home/$username/.ssh
+    
+    echo "[$(date)] Configuration SSH terminée"
 }
 
 # Appliquer la configuration WiFi
@@ -694,12 +774,16 @@ apply_wifi_config() {
     local ssid=$1
     local password=$2
     
+    echo "[$(date)] Connexion au WiFi: $ssid"
+    
     # Utiliser nmcli pour configurer le WiFi
     if [ -n "$password" ]; then
         nmcli device wifi connect "$ssid" password "$password"
     else
         nmcli device wifi connect "$ssid"
     fi
+    
+    echo "[$(date)] WiFi configuré"
 }
 
 # Point d'entrée principal
@@ -708,15 +792,27 @@ if [ "$1" = "apply" ]; then
     
     SSH_USERNAME=$(echo "$CONFIG" | jq -r '.ssh_username')
     SSH_PASSWORD=$(echo "$CONFIG" | jq -r '.ssh_password')
+    WIFI_COUNTRY=$(echo "$CONFIG" | jq -r '.wifi_country')
     SSID=$(echo "$CONFIG" | jq -r '.ssid')
     WIFI_PASSWORD=$(echo "$CONFIG" | jq -r '.password')
     
-    # Appliquer la configuration
+    echo "[$(date)] ======================================"
+    echo "[$(date)] Application de la configuration"
+    echo "[$(date)] ======================================"
+    
+    # Appliquer le pays WiFi EN PREMIER
+    apply_wifi_country "$WIFI_COUNTRY"
+    
+    # Appliquer la configuration SSH
     apply_ssh_config "$SSH_USERNAME" "$SSH_PASSWORD"
+    
+    # Appliquer la configuration WiFi
     apply_wifi_config "$SSID" "$WIFI_PASSWORD"
     
     # Marquer comme configuré
     touch /etc/runtipi-configured
+    
+    echo "[$(date)] Configuration terminée, redémarrage..."
     
     # Redémarrer pour appliquer tous les changements
     sleep 2
@@ -726,7 +822,7 @@ BACKENDEOF
 
 chmod +x /usr/local/bin/wifi-connect-backend.sh
 
-log "✓ Backend script créé"
+log "✓ Backend script avec gestion pays créé"
 
 # Créer le script de vérification de connectivité
 log "Création du script de vérification..."
@@ -769,8 +865,8 @@ log "✓ Script de vérification créé"
 log "Configuration du service systemd..."
 cat > /etc/systemd/system/wifi-connect.service << 'EOF'
 [Unit]
-Description=Balena WiFi Connect with Custom UI
-After=NetworkManager.service
+Description=Balena WiFi Connect with Custom UI and Country Selection
+After=NetworkManager.service unblock-rfkill.service
 Wants=NetworkManager.service
 Before=runtipi-installer.service
 
@@ -797,4 +893,5 @@ rm -f /tmp/wifi-connect.tar.gz
 
 log "======================================"
 log "Installation de WiFi-Connect terminée"
+log "Configuration avec sélecteur de pays"
 log "======================================"

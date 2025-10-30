@@ -308,20 +308,52 @@ log "✓ Paquets installés"
 log "Note: Docker sera installé automatiquement par Runtipi au premier démarrage"
 
 # ============================================================================
-# CRÉER L'UTILISATEUR
+# CRÉER L'UTILISATEUR - CORRECTION FINALE GARANTIE
 # ============================================================================
 
 log "Création de l'utilisateur $DEFAULT_USER..."
 
+# FORCE : Supprimer l'utilisateur s'il existe
+userdel -rf "$DEFAULT_USER" 2>/dev/null || true
+
+# Créer l'utilisateur proprement
+useradd -m -s /bin/bash -G sudo,netdev "$DEFAULT_USER" || {
+    log "❌ ERREUR CRITIQUE : Impossible de créer $DEFAULT_USER"
+    exit 1
+}
+
+# FORCE : Définir le mot de passe
+echo "$DEFAULT_USER:$DEFAULT_PASSWORD" | chpasswd || {
+    log "❌ ERREUR CRITIQUE : Impossible de définir le password"
+    exit 1
+}
+
+# FORCE : Déverrouiller le compte (au cas où il serait verrouillé)
+passwd -u "$DEFAULT_USER" 2>/dev/null || true
+
+# Vérifier que l'utilisateur est bien créé
 if ! id "$DEFAULT_USER" &>/dev/null; then
-    useradd -m -s /bin/bash -G sudo,netdev "$DEFAULT_USER"
-    echo "$DEFAULT_USER:$DEFAULT_PASSWORD" | chpasswd
-    log "✓ Utilisateur créé"
-else
-    log "Utilisateur déjà existant"
-    # Ajouter au groupe netdev si nécessaire
-    usermod -aG netdev "$DEFAULT_USER" 2>/dev/null || true
+    log "❌ ERREUR CRITIQUE : Utilisateur non créé!"
+    exit 1
 fi
+
+log "✓ Utilisateur $DEFAULT_USER créé et déverrouillé"
+
+# ============================================================================
+# ACTIVER AUTOLOGIN SUR TTY1 (connexion automatique sans password - DEBUG MODE)
+# ============================================================================
+
+log "Activation de l'autologin pour debug..."
+
+mkdir -p /etc/systemd/system/getty@tty1.service.d
+
+cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf << AUTOLOGINEOF
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin $DEFAULT_USER --noclear %I \$TERM
+AUTOLOGINEOF
+
+log "✓ Autologin activé - Tu seras auto-connecté au démarrage"
 
 # ============================================================================
 # CONFIGURER SSH
@@ -355,6 +387,7 @@ log "✓ SSH configuré"
 log "Configuration de sudo pour l'utilisateur $DEFAULT_USER..."
 
 # Créer le fichier sudoers pour runtipi
+mkdir -p /etc/sudoers.d
 cat > /etc/sudoers.d/$DEFAULT_USER << SUDOEOF
 $DEFAULT_USER ALL=(ALL) NOPASSWD: ALL
 SUDOEOF
@@ -443,12 +476,13 @@ log "║                                                    ║"
 log "║     ✓ Customisation du système terminée !         ║"
 log "║                                                    ║"
 log "║  Au premier démarrage:                            ║"
-log "║  1. WiFi-Connect apparaîtra si pas de réseau     ║"
-log "║  2. Runtipi s'installera automatiquement         ║"
-log "║  3. L'accès web sera disponible après ~5-10 min  ║"
+log "║  1. Tu seras AUTO-CONNECTÉ (runtipi)             ║"
+log "║  2. WiFi-Connect émettra le portail captif       ║"
+log "║  3. Configure WiFi depuis ton smartphone         ║"
+log "║  4. Runtipi s'installera automatiquement         ║"
+log "║  5. L'accès web sera disponible après ~5-10 min  ║"
 log "║                                                    ║"
 log "╚════════════════════════════════════════════════════╝"
 log ""
 
 log "✓ Configuration terminée avec succès !"
-

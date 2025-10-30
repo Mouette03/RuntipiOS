@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script d'installation de Balena WiFi-Connect - VERSION FINALE CORRIGÉE v2
+# Script d'installation de Balena WiFi-Connect - VERSION FINALE GARANTIE
 # Avec dépendances strictes, délais systemd et toutes les variables parsées
 
 set -e
@@ -10,7 +10,7 @@ log() {
 }
 
 log "======================================"
-log "Installation de WiFi-Connect - VERSION FINALE CORRIGÉE"
+log "Installation de WiFi-Connect - VERSION FINALE GARANTIE"
 log "======================================"
 
 # ============================================================================
@@ -46,7 +46,7 @@ WIFI_CONNECT_VERSION=${WIFI_CONNECT_VERSION:-"4.4.6"}
 WIFI_CONNECT_SSID=${WIFI_CONNECT_SSID:-"RuntipiOS-Setup"}
 WIFI_COUNTRY=${WIFI_COUNTRY:-"FR"}
 
-# Détection architecture - CORRECTION #2
+# Détection architecture
 ARCH=$(uname -m)
 case "$ARCH" in
     armv6l)
@@ -747,7 +747,7 @@ done
 
 sleep 5
 
-# CORRECTION #3 : Vérifier que Ethernet ou WiFi a une IP (pas juste "UP")
+# Vérifier que Ethernet ou WiFi a une IP
 log "Vérification réseau..."
 for i in {1..30}; do
     # Vérifier Ethernet
@@ -767,8 +767,7 @@ for i in {1..30}; do
     sleep 1
 done
 
-# Pas de réseau détecté, mais NE PAS BLOQUER le boot
-# Laisser wifi-connect.service lancer WiFi-Connect en arrière-plan
+# Pas de réseau détecté - WiFi-Connect sera lancé en arrière-plan
 log "Aucun réseau détecté - WiFi-Connect sera lancé en arrière-plan"
 exit 0
 CHECKEOF
@@ -797,11 +796,8 @@ mkdir -p /home/runtipi
 cd /home/runtipi
 
 log "Lancement du script officiel Runtipi..."
-# Utiliser l'URL officielle Runtipi
-curl -L https://setup.runtipi.io | bash || {
-    log "Tentative avec URL alternative..."
-    curl -fsSL https://docs.runtipi.io/install.sh | bash || true
-}
+# Utiliser l'URL officielle Runtipi depuis le site
+curl -L https://setup.runtipi.io | bash
 
 touch /etc/runtipi-configured
 
@@ -818,7 +814,7 @@ log "✓ Script d'installation Runtipi créé"
 
 log "Configuration des services systemd..."
 
-# Service WiFi-Connect - CORRECTION #1 & #2 : DefaultDependencies=no + After=multi-user.target
+# Service WiFi-Connect - CORRECTIONS APPLIQUÉES
 cat > /etc/systemd/system/wifi-connect.service << 'WIFISVCEOF'
 [Unit]
 Description=Balena WiFi Connect - Captive Portal
@@ -839,7 +835,7 @@ KillMode=process
 WantedBy=multi-user.target
 WIFISVCEOF
 
-# Service Runtipi Installer - CORRECTION #3 : DefaultDependencies=no
+# Service Runtipi Installer
 cat > /etc/systemd/system/runtipi-installer.service << 'RUNTIPISVCEOF'
 [Unit]
 Description=Runtipi Auto-Installer
@@ -897,9 +893,11 @@ log "║                                                    ║"
 log "║     ✓ Installation WiFi-Connect terminée !        ║"
 log "║                                                    ║"
 log "║  Au premier démarrage:                            ║"
-log "║  1. WiFi-Connect apparaîtra si pas de réseau     ║"
-log "║  2. Runtipi s'installera automatiquement         ║"
-log "║  3. L'accès web sera disponible après ~5-10 min  ║"
+log "║  1. Tu seras AUTO-CONNECTÉ (runtipi)             ║"
+log "║  2. WiFi-Connect émettra le portail captif       ║"
+log "║  3. Configure WiFi depuis ton smartphone         ║"
+log "║  4. Runtipi s'installera automatiquement         ║"
+log "║  5. L'accès web sera disponible après ~5-10 min  ║"
 log "║                                                    ║"
 log "╚════════════════════════════════════════════════════╝"
 log ""

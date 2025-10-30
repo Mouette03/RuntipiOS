@@ -367,7 +367,7 @@ chroot "$MOUNT_DIR" systemctl enable expand-rootfs.service 2>/dev/null || log_wa
 log_info "Copie des scripts de configuration..."
 cp "${BUILD_DIR}/scripts/customize-os.sh" "${MOUNT_DIR}/tmp/customize-os.sh"
 cp "${BUILD_DIR}/scripts/install-wifi-connect.sh" "${MOUNT_DIR}/tmp/install-wifi-connect.sh"
-cp "${BUILD_DIR}/scripts/install-runtipi.sh" "${MOUNT_DIR}/tmp/install-runtipi.sh"
+#cp "${BUILD_DIR}/scripts/install-runtipi.sh" "${MOUNT_DIR}/tmp/install-runtipi.sh"
 cp "${BUILD_DIR}/scripts/setup-services.sh" "${MOUNT_DIR}/tmp/setup-services.sh"
 cp "$CONFIG_FILE" "${MOUNT_DIR}/tmp/config.yml"
 chmod +x "${MOUNT_DIR}/tmp/"*.sh

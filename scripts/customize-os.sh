@@ -148,6 +148,31 @@ rm -f /boot/firmware/userconf
 log "✓ Wizard de première installation désactivé"
 
 # ============================================================================
+# DÉSACTIVER CLOUD-INIT (évite le blocage au boot)
+# ============================================================================
+
+log "Désactivation de cloud-init..."
+
+# Sentinelle officielle pour désactiver cloud-init
+mkdir -p /etc/cloud
+touch /etc/cloud/cloud-init.disabled
+
+# Masquer/désactiver les unités cloud-init (inoffensif en chroot)
+for u in cloud-init-local.service cloud-init.service cloud-config.service cloud-final.service; do
+  systemctl disable "$u" 2>/dev/null || true
+  systemctl mask "$u" 2>/dev/null || true
+done
+
+# Renforcer la désactivation via un fragment de configuration
+mkdir -p /etc/cloud/cloud.cfg.d
+cat > /etc/cloud/cloud.cfg.d/99-disabled.cfg << 'EOF'
+# Disable all cloud-init stages
+disable_cloud_init: true
+EOF
+
+log "✓ cloud-init désactivé"
+
+# ============================================================================
 # CONFIGURER LE PAYS WIFI (OBLIGATOIRE POUR DÉBLOQUER RFKILL)
 # ============================================================================
 

@@ -173,6 +173,22 @@ EOF
 log "✓ cloud-init désactivé"
 
 # ============================================================================
+# DÉSACTIVER LES SERVICES QUI BLOQUENT LE BOOT
+# ============================================================================
+
+log "Désactivation des services bloquants au boot..."
+
+# systemd-networkd-wait-online bloque souvent le boot (attend connexion réseau)
+systemctl disable systemd-networkd-wait-online.service 2>/dev/null || true
+systemctl mask systemd-networkd-wait-online.service 2>/dev/null || true
+
+# NetworkManager-wait-online peut aussi bloquer
+systemctl disable NetworkManager-wait-online.service 2>/dev/null || true
+systemctl mask NetworkManager-wait-online.service 2>/dev/null || true
+
+log "✓ Services bloquants désactivés"
+
+# ============================================================================
 # CONFIGURER LE PAYS WIFI (OBLIGATOIRE POUR DÉBLOQUER RFKILL)
 # ============================================================================
 
@@ -435,3 +451,4 @@ log "╚════════════════════════
 log ""
 
 log "✓ Configuration terminée avec succès !"
+

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script d'installation de Balena WiFi-Connect - VERSION FINALE CORRIGÉE
+# Script d'installation de Balena WiFi-Connect - VERSION FINALE CORRIGÉE v2
 # Avec dépendances strictes, délais systemd et toutes les variables parsées
 
 set -e
@@ -10,7 +10,7 @@ log() {
 }
 
 log "======================================"
-log "Installation de WiFi-Connect - VERSION FINALE"
+log "Installation de WiFi-Connect - VERSION FINALE CORRIGÉE"
 log "======================================"
 
 # ============================================================================
@@ -715,7 +715,7 @@ HTMLEOF
 log "✓ Interface HTML créée avec sélecteur de pays WiFi"
 
 # ============================================================================
-# CRÉER LE SCRIPT DE VÉRIFICATION WIFI CORRIGÉ
+# CRÉER LE SCRIPT DE VÉRIFICATION WIFI CORRIGÉ - NE PAS BLOQUER
 # ============================================================================
 
 log "Création du script de vérification WiFi..."
@@ -767,15 +767,10 @@ for i in {1..30}; do
     sleep 1
 done
 
-# Pas de réseau détecté, lancer WiFi-Connect
-log "Aucun réseau détecté, lancement WiFi-Connect"
-rfkill unblock wifi 2>/dev/null || true
-rfkill unblock wlan 2>/dev/null || true
-
-exec /usr/local/bin/wifi-connect \
-    --portal-ssid "RuntipiOS-Setup" \
-    --portal-interface wlan0 \
-    --ui-directory /usr/local/share/wifi-connect/ui
+# Pas de réseau détecté, mais NE PAS BLOQUER le boot
+# Laisser wifi-connect.service lancer WiFi-Connect en arrière-plan
+log "Aucun réseau détecté - WiFi-Connect sera lancé en arrière-plan"
+exit 0
 CHECKEOF
 
 chmod +x /usr/local/bin/wifi-connect-check.sh
@@ -802,7 +797,11 @@ mkdir -p /home/runtipi
 cd /home/runtipi
 
 log "Lancement du script officiel Runtipi..."
-curl -L https://setup.runtipi.io | bash
+# Utiliser l'URL officielle Runtipi
+curl -L https://setup.runtipi.io | bash || {
+    log "Tentative avec URL alternative..."
+    curl -fsSL https://docs.runtipi.io/install.sh | bash || true
+}
 
 touch /etc/runtipi-configured
 
@@ -814,46 +813,43 @@ chmod +x /usr/local/bin/install-runtipi.sh
 log "✓ Script d'installation Runtipi créé"
 
 # ============================================================================
-# CONFIGURER LES SERVICES SYSTEMD
+# CONFIGURER LES SERVICES SYSTEMD - AVEC CORRECTIONS CRITIQUES
 # ============================================================================
 
 log "Configuration des services systemd..."
 
-# Service WiFi-Connect
+# Service WiFi-Connect - CORRECTION #1 & #2 : DefaultDependencies=no + After=multi-user.target
 cat > /etc/systemd/system/wifi-connect.service << 'WIFISVCEOF'
 [Unit]
 Description=Balena WiFi Connect - Captive Portal
-After=NetworkManager.service network-online.target unblock-rfkill.service
-Wants=network-online.target
-Requires=NetworkManager.service
-Before=runtipi-installer.service
+After=multi-user.target unblock-rfkill.service
+DefaultDependencies=no
 ConditionPathExists=!/etc/runtipi-configured
 
 [Service]
 Type=simple
-ExecStartPre=/bin/sleep 15
-ExecStart=/usr/local/bin/wifi-connect-check.sh
-Restart=on-failure
-RestartSec=20
+ExecStart=/usr/local/bin/wifi-connect --portal-ssid RuntipiOS-Setup --portal-interface wlan0 --ui-directory /usr/local/share/wifi-connect/ui
+Restart=always
+RestartSec=10
 StandardOutput=journal
 StandardError=journal
-TimeoutStartSec=300
 KillMode=process
 
 [Install]
 WantedBy=multi-user.target
 WIFISVCEOF
 
-# Service Runtipi Installer
+# Service Runtipi Installer - CORRECTION #3 : DefaultDependencies=no
 cat > /etc/systemd/system/runtipi-installer.service << 'RUNTIPISVCEOF'
 [Unit]
 Description=Runtipi Auto-Installer
-After=network-online.target wifi-connect.service
-Wants=network-online.target
+After=multi-user.target network.target
+DefaultDependencies=no
 ConditionPathExists=!/etc/runtipi-configured
 
 [Service]
 Type=oneshot
+ExecStartPre=/bin/sleep 30
 ExecStart=/usr/local/bin/install-runtipi.sh
 RemainAfterExit=yes
 StandardOutput=journal

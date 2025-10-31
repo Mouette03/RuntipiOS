@@ -34,7 +34,7 @@ runtipi:
 wifi_connect:
   # Version de Balena WiFi-Connect à utiliser.
   # Voir : https://github.com/balena-io/wifi-connect/releases
-  version: "v4.4.6"
+  version: "4.4.6"
   # Nom du réseau WiFi temporaire qui sera créé
   ssid: "RuntipiOS-Setup"
 

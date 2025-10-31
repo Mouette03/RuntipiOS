@@ -3,305 +3,104 @@ name: Build and Release RuntipiOS
 on:
   push:
     tags:
-      - 'v*'
-    branches:
-      - main
+      - 'v*' # Se déclenche quand un tag de version est poussé (ex: v1.0.0)
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag for the release'
+        description: 'Optional version override (default: dev build)'
         required: false
-        default: 'dev'
-      skip_cache:
-        description: 'Skip build cache'
-        type: boolean
-        required: false
-        default: false
-
-env:
-  REGISTRY: ghcr.io
+        default: ''
 
 jobs:
-  build-image:
+  build-and-release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      packages: write
-    
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      config_hash: ${{ steps.config.outputs.hash }}
-      repo_lower: ${{ steps.repo.outputs.repo_lower }}
-      compression_format: ${{ steps.config.outputs.compression_format }}
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Extract version
-        id: version
+      - name: 📝 Extract Version and Config
+        id: metadata
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION_RAW="${{ github.event.inputs.version }}"
-          elif [ "${{ github.event_name }}" = "release" ]; then
-            VERSION_RAW="${{ github.event.release.tag_name }}"
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            VERSION=${{ github.ref_name }}
+          elif [[ -n "${{ github.event.inputs.version }}" ]]; then
+            VERSION=${{ github.event.inputs.version }}
           else
-            if echo "$GITHUB_REF" | grep -q "^refs/tags/"; then
-              VERSION_RAW=${GITHUB_REF#refs/tags/}
-            elif echo "$GITHUB_REF" | grep -q "^refs/heads/"; then
-              VERSION_RAW="dev-$(date +%Y%m%d-%H%M%S)"
-            else
-              VERSION_RAW="dev-$(date +%Y%m%d)"
-            fi
+            VERSION="dev-$(date +%Y%m%d)"
           fi
-          
-          VERSION=${VERSION_RAW#v}
-          SANITIZED=$(echo "$VERSION" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_.-]/-/g')
-          SANITIZED=$(echo "$SANITIZED" | sed 's/^-*//;s/-*$//')
-          
-          echo "version=$SANITIZED" >> $GITHUB_OUTPUT
-          echo "version_raw=$VERSION_RAW" >> $GITHUB_OUTPUT
-          echo "🏗️ Building version: ${SANITIZED} (raw: ${VERSION_RAW})"
+          echo "VERSION=${VERSION#v}" >> $GITHUB_OUTPUT
+          echo "Version determined: ${VERSION#v}"
 
-      - name: Sanitize repository name
-        id: repo
-        run: |
-          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          echo "repo_lower=$REPO_LOWER" >> $GITHUB_OUTPUT
-          echo "Repository (lowercase): $REPO_LOWER"
-
-      - name: Read and validate config
-        id: config
-        run: |
-          if [ ! -f config.yml ]; then
-            echo "❌ config.yml not found!"
-            exit 1
-          fi
-          
-          CONFIG_HASH=$(sha256sum config.yml | cut -d' ' -f1 | cut -c1-8)
-          echo "hash=$CONFIG_HASH" >> $GITHUB_OUTPUT
-          echo "📝 Config hash: $CONFIG_HASH"
-          
-          COMPRESSION_FORMAT=$(grep -A2 "^build:" config.yml | grep "compression_format:" | awk -F'"' '{print $2}' | awk '{print $1}')
+          COMPRESSION_FORMAT=$(yq '.build.compression_format' config.yml | tr -d '"')
           [ -z "$COMPRESSION_FORMAT" ] && COMPRESSION_FORMAT="xz"
-          echo "compression_format=$COMPRESSION_FORMAT" >> $GITHUB_OUTPUT
-          echo "📦 Compression format: $COMPRESSION_FORMAT"
-          
-          echo "📋 Configuration:"
-          cat config.yml
+          echo "COMPRESSION_FORMAT=$COMPRESSION_FORMAT" >> $GITHUB_OUTPUT
+          echo "Compression format: $COMPRESSION_FORMAT"
 
-      - name: Free up disk space
+      - name: 🧹 Free up disk space
         run: |
-          echo "🧹 Cleaning up disk space..."
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
           sudo docker image prune -a -f
           df -h
 
-      - name: Set up QEMU
+      - name: ⚙️ Set up QEMU for ARM cross-compilation
         uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64,arm
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push builder image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          platforms: linux/amd64
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ steps.repo.outputs.repo_lower }}:${{ steps.version.outputs.version }}
-            ${{ env.REGISTRY }}/${{ steps.repo.outputs.repo_lower }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
-            VERSION=${{ steps.version.outputs.version }}
-
-  build-rpi-image:
-    needs: build-image
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      packages: write
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Free up disk space
+      - name: 🏗️ Build RuntipiOS Image
         run: |
-          echo "🧹 Cleaning up disk space..."
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          df -h
+          echo "Building the builder image..."
+          docker build -t runtipios-builder .
 
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Prepare output directory
-        run: |
+          echo "Starting the RuntipiOS image build process..."
           mkdir -p output
-          chmod 777 output
-
-      - name: Pull builder image
-        run: |
-          IMAGE="${{ env.REGISTRY }}/${{ needs.build-image.outputs.repo_lower }}:${{ needs.build-image.outputs.version }}"
-          echo "📥 Pulling builder image: $IMAGE"
-          docker pull $IMAGE
-          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
-
-      - name: Build Raspberry Pi image
-        run: |
-          echo "🔨 Building Raspberry Pi OS image..."
-          echo "Version: ${{ needs.build-image.outputs.version }}"
-          echo "Config hash: ${{ needs.build-image.outputs.config_hash }}"
-          echo "Compression: ${{ needs.build-image.outputs.compression_format }}"
-          
-          OUTPUT_NAME="RuntipiOS-${{ needs.build-image.outputs.version }}-arm64"
-          echo "OUTPUT_NAME=$OUTPUT_NAME" >> $GITHUB_ENV
           
           docker run --rm --privileged \
-            -e VERSION="${{ needs.build-image.outputs.version }}" \
-            -e OUTPUT_NAME="$OUTPUT_NAME" \
+            -e OUTPUT_NAME="RuntipiOS-${{ steps.metadata.outputs.VERSION }}" \
             -v $(pwd)/config.yml:/build/config.yml:ro \
-            -v $(pwd)/output:/build/output \
             -v $(pwd)/scripts:/build/scripts:ro \
-            ${{ env.IMAGE }} \
-            /bin/bash -c "/build/scripts/build-image.sh"
+            -v $(pwd)/output:/build/output \
+            runtipios-builder \
+            /build/scripts/build-image.sh
 
-      - name: Verify image creation
+      - name: 📦 Verify and Prepare Artifacts
         run: |
-          echo "📦 Checking output directory:"
+          echo "Verifying created image..."
           ls -lh output/
-          
-          # Accepter n'importe quel format compressé
-          if ls output/*.img.* 1> /dev/null 2>&1; then
-            echo "✅ Compressed image found!"
-            for img in output/*.img.*; do
-              echo "  - $(basename $img): $(du -h $img | cut -f1)"
-            done
-          else
+          if ! ls output/*.img.* 1> /dev/null 2>&1; then
             echo "❌ ERROR: No compressed image found!"
             exit 1
           fi
           
-          # Vérifier qu'il n'y a pas d'image brute
-          if ls output/*.img 1> /dev/null 2>&1; then
-            echo "❌ ERROR: Uncompressed .img file found! Should be cleaned."
-            exit 1
-          fi
-
-      - name: Generate checksums
-        run: |
+          echo "Generating checksums..."
           cd output
-          echo "🔐 Generating checksums..."
           sha256sum * > SHA256SUMS
-          echo "Checksums generated:"
           cat SHA256SUMS
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: runtipios-${{ needs.build-image.outputs.version }}
-          path: output/
-          retention-days: 30
-          if-no-files-found: error
-          compression-level: 0
-
-  create-release:
-    needs: [build-image, build-rpi-image]
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && needs.build-image.outputs.version != 'dev')
-    permissions:
-      contents: write
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: runtipios-${{ needs.build-image.outputs.version }}
-          path: artifacts/
-
-      - name: Verify downloaded artifacts
-        run: |
-          echo "📋 Downloaded artifacts:"
-          ls -lh artifacts/
-          
-          FILE_COUNT=$(ls artifacts/*.img.* 2>/dev/null | wc -l)
-          if [ "$FILE_COUNT" -eq 0 ]; then
-            echo "❌ ERROR: No compressed image found!"
-            exit 1
-          fi
-          
-          cd artifacts
-          if [ -f SHA256SUMS ]; then
-            echo "🔐 Verifying checksums..."
-            sha256sum -c SHA256SUMS
-          fi
-
-      - name: Generate release notes
-        id: release_notes
-        run: |
-          cat > release_notes.md << 'EOF'
-          ## 🚀 RuntipiOS ${{ needs.build-image.outputs.version }}
-          
-          Image Raspberry Pi OS optimisée pour Runtipi avec configuration WiFi automatique via smartphone.
-          
-          ### 📦 Contenu
-          
-          - **Base**: Raspberry Pi OS Lite (ARM64)
-          - **Runtipi**: Installation automatique au premier démarrage
-          - **WiFi-Connect**: Configuration réseau via portail captif multilingue (FR/EN)
-          - **Services**: Docker, Avahi (mDNS), SSH
-          
-          ### 🔧 Installation
-          
-          1. **Téléchargez** le fichier `.img.${{ needs.build-image.outputs.compression_format }}` depuis les assets ci-dessous
-          2. **Flashez** sur une carte microSD (minimum 8 Go) avec [Raspberry Pi Imager](https://www.raspberrypi.com/software/) ou Etcher
-          3. **Insérez** la carte SD dans votre Raspberry Pi et démarrez
-          4. **Connectez-vous** au WiFi "RuntipiOS-Setup" avec votre smartphone
-          5. **Configurez** vos identifiants et réseau WiFi
-          6. **Attendez** l'installation de Runtipi (environ 10-15 minutes)
-          7. **Accédez** à Runtipi sur `http://runtipios.local`
-          
-          ### 📊 Checksums
-          
-          Voir le fichier `SHA256SUMS` pour vérifier l'intégrité de l'image.
-          EOF
-
-      - name: Create Release
+      - name: 🚀 Create GitHub Release and Upload Assets
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ needs.build-image.outputs.version }}
-          name: RuntipiOS v${{ needs.build-image.outputs.version }}
-          body_path: release_notes.md
+          tag_name: ${{ github.ref_name }}
+          name: RuntipiOS ${{ github.ref_name }}
+          body: |
+            ## 🚀 RuntipiOS ${{ github.ref_name }}
+            
+            Optimized Raspberry Pi OS image for Runtipi with automatic WiFi setup via smartphone.
+            
+            ### 🔧 Installation
+            1. Download the `.img.${{ steps.metadata.outputs.COMPRESSION_FORMAT }}` file below.
+            2. Flash it to a microSD card (16GB recommended) using [Raspberry Pi Imager](https://www.raspberrypi.com/software/).
+            3. Boot your Raspberry Pi (with Ethernet plugged in, or not).
+            4. If no Ethernet, connect to the "RuntipiOS-Setup" WiFi with your phone.
+            5. The captive portal will guide you to connect to your home WiFi.
+            6. After reboot, Runtipi will install automatically.
+            7. Access Runtipi at `http://runtipios.local`.
+            
+            ### 📊 Checksums
+            Verify the integrity of the downloaded image using the `SHA256SUMS` file.
           files: |
-            artifacts/*.img.*
-            artifacts/SHA256SUMS
-          draft: false
-          prerelease: ${{ contains(needs.build-image.outputs.version, 'dev') || contains(needs.build-image.outputs.version, 'alpha') || contains(needs.build-image.outputs.version, 'beta') }}
-          generate_release_notes: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            output/*.img.*
+            output/SHA256SUMS
+

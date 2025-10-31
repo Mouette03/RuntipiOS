@@ -1,57 +1,57 @@
 #!/bin/bash
-# Script de customisation du système d'exploitation - Version Robuste
+# Script de customisation du système - Version Chroot-safe
 set -e
 exec > >(tee -a /var/log/customize-os.log) 2>&1
 
-echo "Début de la customisation du système - RuntipiOS"
-CONFIG_FILE="/tmp/config.yml"
-if [ ! -f "$CONFIG_FILE" ]; then echo "ERREUR: config.yml introuvable !" && exit 1; fi
-eval "$(yq -o=shell "$CONFIG_FILE")"
+echo "Début de la customisation du système"
 
-echo "Configuration du système..."
-hostnamectl set-hostname "$system_hostname"
-timedatectl set-timezone "$system_timezone"
-echo "LANG=$system_locale" > /etc/default/locale
-sed -i "s/^# *${system_locale}/${system_locale}/" /etc/locale.gen && locale-gen
-sed -i "s/XKBLAYOUT=.*/XKBLAYOUT=\"$system_keyboard_layout\"/" /etc/default/keyboard
-raspi-config nonint do_wifi_country "$system_wifi_country"
+# Arguments passés par build-image.sh
+HOSTNAME=$1
+TIMEZONE=$2
+LOCALE=$3
+KBD_LAYOUT=$4
+WIFI_COUNTRY=$5
+DEFAULT_USER=$6
+DEFAULT_PASSWORD=$7
+AUTOLOGIN=$8
+PACKAGES_INSTALL=$9
+PACKAGES_REMOVE=${10}
 
-echo "Nettoyage des services par défaut..."
+# Configuration système
+hostnamectl set-hostname "$HOSTNAME"
+timedatectl set-timezone "$TIMEZONE"
+echo "LANG=$LOCALE" > /etc/default/locale
+sed -i "s/^# *${LOCALE}/${LOCALE}/" /etc/locale.gen && locale-gen
+sed -i "s/XKBLAYOUT=.*/XKBLAYOUT=\"$KBD_LAYOUT\"/" /etc/default/keyboard
+raspi-config nonint do_wifi_country "$WIFI_COUNTRY"
+
+# Nettoyage
 rm -f /etc/xdg/autostart/piwiz.desktop
 touch /etc/cloud/cloud-init.disabled
-systemctl disable --now userconfig.service cloud-init.service systemd-networkd-wait-online.service NetworkManager-wait-online.service 2>/dev/null || true
 
-echo "Mise à jour et installation des paquets..."
+# Paquets
 apt-get update && apt-get upgrade -y
-apt-get install -y --no-install-recommends \
-    network-manager avahi-daemon openssh-server rfkill iw \
-    $(echo "$packages_install" | sed 's/- //g') \
-    && apt-get remove -y --purge $(echo "$packages_remove" | sed 's/- //g')
+apt-get install -y --no-install-recommends network-manager avahi-daemon openssh-server rfkill iw $PACKAGES_INSTALL
+apt-get remove -y --purge $PACKAGES_REMOVE
 
-echo "Configuration de l'utilisateur '$system_default_user'..."
+# Utilisateur
 if id "pi" &>/dev/null; then
-    usermod -l "$system_default_user" pi
-    usermod -d "/home/$system_default_user" -m "$system_default_user"
-    groupmod -n "$system_default_user" pi
+    usermod -l "$DEFAULT_USER" pi && usermod -d "/home/$DEFAULT_USER" -m "$DEFAULT_USER" && groupmod -n "$DEFAULT_USER" pi
 else
-    useradd -m -s /bin/bash -G sudo,netdev "$system_default_user"
+    useradd -m -s /bin/bash -G sudo,netdev "$DEFAULT_USER"
 fi
-echo "$system_default_user:$system_default_password" | chpasswd
-if [ "$system_autologin" = "true" ]; then
+echo "$DEFAULT_USER:$DEFAULT_PASSWORD" | chpasswd
+if [ "$AUTOLOGIN" = "true" ]; then
     mkdir -p /etc/systemd/system/getty@tty1.service.d
-    echo -e "[Service]\nExecStart=\nExecStart=-/sbin/agetty --autologin $system_default_user --noclear %I \$TERM" > /etc/systemd/system/getty@tty1.service.d/autologin.conf
+    echo -e "[Service]\nExecStart=\nExecStart=-/sbin/agetty --autologin $DEFAULT_USER --noclear %I \$TERM" > /etc/systemd/system/getty@tty1.service.d/autologin.conf
 fi
-echo "$system_default_user ALL=(ALL) NOPASSWD: ALL" > "/etc/sudoers.d/010_${system_default_user}-nopasswd"
+echo "$DEFAULT_USER ALL=(ALL) NOPASSWD: ALL" > "/etc/sudoers.d/010_${DEFAULT_USER}-nopasswd"
 sed -i 's/^#?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
 
-echo "Copie du fichier de configuration..."
-mkdir -p /etc/runtipios && cp "$CONFIG_FILE" /etc/runtipios/config.yml
-
-echo "Création du message de bienvenue (MOTD)..."
+# MOTD
 cat > /etc/motd << 'MOTDEOF'
 \033
 
 ---
 
-### 6. `scripts/install-wifi-connect.sh` (Installation du portail WiFi)
-
+#### 3. Fichier `scripts/install-wifi-connect.sh` (L'installateur du portail)

@@ -5,7 +5,6 @@ exec > >(tee -a /var/log/setup-services.log) 2>&1
 
 echo "Création des fichiers de service systemd"
 
-# Service de redimensionnement de la partition
 cat > /etc/systemd/system/expand-rootfs.service << 'SERVICEEOF'
 [Unit]
 Description=Expand Root Filesystem on First Boot
@@ -18,7 +17,6 @@ RemainAfterExit=yes
 WantedBy=multi-user.target
 SERVICEEOF
 
-# Service pour débloquer le WiFi
 cat > /etc/systemd/system/unblock-rfkill.service << 'RFKILLEOF'
 [Unit]
 Description=Unblock WiFi rfkill at boot
@@ -29,7 +27,6 @@ ExecStart=/usr/sbin/rfkill unblock all
 WantedBy=multi-user.target
 RFKILLEOF
 
-# Service de premier démarrage "intelligent"
 cat > /etc/systemd/system/runtipios-first-boot.service << 'BOOTSVCEOF'
 [Unit]
 Description=RuntipiOS First Boot Logic
@@ -42,7 +39,6 @@ Restart=on-failure
 WantedBy=multi-user.target
 BOOTSVCEOF
 
-# Service d'installation de Runtipi
 cat > /etc/systemd/system/runtipi-installer.service << 'RUNTIPIEOF'
 [Unit]
 Description=Runtipi Automatic Installer

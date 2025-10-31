@@ -5,7 +5,6 @@ exec > >(tee -a /var/log/install-wifi-connect.log) 2>&1
 
 echo "Installation de Balena WiFi-Connect"
 
-# --- Arguments ---
 WIFI_CONNECT_VERSION=$1
 RASPIOS_ARCH=$2
 PORTAL_SSID=$3

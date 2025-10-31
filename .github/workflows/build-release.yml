@@ -15,7 +15,7 @@ jobs:
   build-and-release:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # Nécessaire pour créer et mettre à jour les releases
 
     steps:
       - name: Checkout repository
@@ -103,4 +103,3 @@ jobs:
           files: |
             output/*.img.*
             output/SHA256SUMS
-

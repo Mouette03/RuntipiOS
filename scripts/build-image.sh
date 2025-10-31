@@ -34,15 +34,11 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# ============================================================================
-#               --- LECTURE SÉCURISÉE DE LA CONFIGURATION ---
-# ============================================================================
+# --- Lecture de la configuration ---
 log_info "Lecture sécurisée de la configuration depuis ${CONFIG_FILE}..."
 if [ ! -f "$CONFIG_FILE" ]; then log_error "Fichier de configuration introuvable!" && exit 1; fi
 
-get_config() {
-    yq -r "$1" "$CONFIG_FILE"
-}
+get_config() { yq -r "$1" "$CONFIG_FILE"; }
 
 RASPIOS_URL=$(get_config '.raspios.url')
 RASPIOS_ARCH=$(get_config '.raspios.arch')
@@ -52,8 +48,6 @@ BUILD_COMPRESSION_FORMAT=$(get_config '.build.compression_format')
 
 if [ -z "$RASPIOS_URL" ]; then log_error "raspios.url n'est pas défini dans config.yml" && exit 1; fi
 log_success "Configuration lue avec succès."
-# ============================================================================
-
 
 # --- Préparation de l'image ---
 BASE_IMAGE_XZ="${WORK_DIR}/raspios-base.img.xz"
@@ -75,10 +69,16 @@ truncate -s "${BUILD_IMAGE_SIZE}G" "$BASE_IMAGE"
 # --- Montage et Chroot ---
 log_info "Montage de l'image..."
 parted -s "$BASE_IMAGE" resizepart 2 100%
+
+# --- MODIFICATION DÉFINITIVE ICI ---
+# Ajout du drapeau -P pour forcer le scan des partitions
 LOOP_DEVICE=$(losetup -f --show -P "$BASE_IMAGE")
+
 BOOT_PART="${LOOP_DEVICE}p1"
 ROOT_PART="${LOOP_DEVICE}p2"
-sleep 2
+
+sleep 2 # Laisser le temps aux partitions d'apparaître
+
 mount "$ROOT_PART" "$MOUNT_DIR"
 mkdir -p "${MOUNT_DIR}/boot/firmware"
 mount "$BOOT_PART" "${MOUNT_DIR}/boot/firmware"

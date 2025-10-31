@@ -57,4 +57,3 @@ packages:
   remove:
     - "wolfram-engine"
     - "libreoffice*"
-

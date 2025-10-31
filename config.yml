@@ -1,139 +1,60 @@
+# ===================================================
 # Configuration RuntipiOS
-# Ce fichier définit les versions et paramètres pour la génération de l'image
+# ===================================================
 
-# Version de Raspberry Pi OS à utiliser
+# -- Configuration de l'image de base --
 raspios:
-# Dernière version stable (Trixie)
-  version: "2025-10-01"  
-# Options: lite, desktop, full
-  variant: "lite"
-# Options: arm64, armhf         
-  arch: "arm64"           
+  # URL de l'image Raspberry Pi OS Lite 64-bit.
+  # Trouvez les dernières versions sur : https://downloads.raspberrypi.com/raspios_lite_arm64/images/
   url: "https://downloads.raspberrypi.com/raspios_lite_arm64/images/raspios_lite_arm64-2025-10-02/2025-10-01-raspios-trixie-arm64-lite.img.xz"
+  # Architecture (ne pas changer, lié à l'URL ci-dessus)
+  arch: "arm64"
 
-# Version de Runtipi
-runtipi:
-# Version de Runtipi à installer (voir https://github.com/runtipi/runtipi/releases)
-  version: "v4.5.3"
-# Installer automatiquement au premier démarrage       
-  auto_install: true
-# Timeout d'installation en secondes (30 min)    
-  install_timeout: 1800   
-  repo_url: "https://github.com/runtipi/runtipi.git"
-
-# Configuration WiFi-Connect (Balena)
-wifi_connect:
-# Version de wifi-connect (voir https://github.com/balena-os/wifi-connect/releases)
-  version: "4.4.6"
-# SSID du point d'accès de configuration        
-  ssid: "RuntipiOS-Setup"
-# Laissez vide pour un réseau ouvert
-  password: ""            
-  portal_interface: "wlan0"
-# Timeout du portail captif (30 min)
-  timeout: 1800
-# 0 = pas de timeout d'inactivité
-  activity_timeout: 0     
-  ui_path: "/usr/local/share/wifi-connect/ui"
-
-# Configuration système
+# -- Configuration du système --
 system:
   hostname: "runtipios"
   timezone: "Europe/Paris"
   locale: "fr_FR.UTF-8"
   keyboard_layout: "fr"
+  # Pays pour la réglementation WiFi (essentiel pour que le WiFi fonctionne)
   wifi_country: "FR"
-
-# Utilisateur par défaut (sera remplacé par la config du portail captif)
-# Ces valeurs ne sont utilisées QUE si le portail captif n'est pas utilisé
+  # Utilisateur et mot de passe par défaut.
+  # L'utilisateur sera invité à changer le mot de passe à la première connexion SSH.
   default_user: "runtipi"
-# SERA REMPLACÉ lors de la configuration via portail
-  default_password: "runtipi"  
-  
-# SSH
-  enable_ssh: true
-  ssh_password_auth: true
-  ssh_port: 22
+  default_password: "runtipi"
+  # Activer l'autologin en console pour le débogage (true/false)
+  autologin: false
 
-# Configuration réseau
-network:
-# Si Ethernet est branché, sauter la configuration WiFi
-  ethernet_priority: true
-  
-# Configuration WiFi de secours (fichier sur boot)
-  enable_wifi_fallback: true
+# -- Configuration de Runtipi --
+runtipi:
+  # L'installation se fait via le script officiel. La version est gérée par ce script.
+  auto_install: true
 
-# Options de build
+# -- Configuration du portail WiFi --
+wifi_connect:
+  # Version de Balena WiFi-Connect à utiliser.
+  # Voir : https://github.com/balena-io/wifi-connect/releases
+  version: "v4.8.5"
+  # Nom du réseau WiFi temporaire qui sera créé
+  ssid: "RuntipiOS-Setup"
+
+# -- Options de build --
 build:
-# Taille de l'image (en Go)
-  image_size: 4
-  
-# Compression de l'image finale
-  compress: true
-# Options: xz, gz, zip
-  compression_format: "gz"  
-  
-# Hostname de build (pour logs)
-  build_hostname: "runtipios-builder"
+  # Taille finale de l'image en Gigaoctets. 16Go est un bon compromis.
+  image_size: 16
+  # Format de compression de l'image finale (xz, gz, ou zip)
+  compression_format: "xz"
 
-# Services additionnels
-services:
-# Avahi (mDNS) pour résolution .local
-  enable_avahi: true
-  
-# Docker (requis pour Runtipi)
-# NOTE: Runtipi installe automatiquement Docker et Docker Compose
-# Ces paramètres sont pour référence uniquement
-  docker:
-    version: "latest"
-  
-# Page de statut web
-  status_page:
-    enable: true
-    port: 8080
-    show_runtipi_logo: true
-
-# Sécurité
-security:
-# Changer les mots de passe au premier login
-  force_password_change: false
-  
-# Désactiver l'utilisateur pi par défaut (s'il existe)
-  disable_default_user: false
-  
-# Configurer le pare-feu
-  enable_firewall: false
-  
-# Activer les mises à jour automatiques de sécurité
-  enable_unattended_upgrades: true
-
-# Packages additionnels à installer
+# -- Paquets additionnels --
+# Liste des paquets à installer en plus du système de base.
 packages:
   install:
-    - git
-    - curl
-    - wget
-    - vim
-    - nano
-    - htop
-    - iotop
-    - ncdu
-    - avahi-daemon
-    - avahi-utils
-    - network-manager
-    - dnsmasq
-    - jq
-# Requis pour le backend wifi-connect
-  
-# Packages à supprimer pour gagner de l'espace
+    - "htop"
+    - "ncdu"
+    - "vim"
+    - "unattended-upgrades" # Pour les mises à jour de sécurité automatiques
+  # Liste des paquets à supprimer (utile si vous partiez d'une image non-lite)
   remove:
-    - wolfram-engine
-    - libreoffice*
+    - "wolfram-engine"
+    - "libreoffice*"
 
-# Métadonnées
-metadata:
-  project_name: "RuntiPIos"
-  project_url: "https://github.com/votre-username/runtipios"
-  description: "Système Raspberry Pi OS optimisé pour Runtipi avec configuration WiFi automatique et portail captif multilingue"
-  author: "Mouette03"
-  license: "MIT"

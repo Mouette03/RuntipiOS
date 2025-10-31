@@ -1,11 +1,24 @@
 #!/bin/bash
-# Script de configuration des services systemd
+# Création des fichiers de service - Version Chroot-safe
 set -e
 exec > >(tee -a /var/log/setup-services.log) 2>&1
 
-echo "Configuration des services système"
+echo "Création des fichiers de service systemd"
 
-# Service pour débloquer le WiFi au démarrage
+# Service de redimensionnement de la partition
+cat > /etc/systemd/system/expand-rootfs.service << 'SERVICEEOF'
+[Unit]
+Description=Expand Root Filesystem on First Boot
+ConditionPathExists=!/etc/expand-rootfs-done
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c "parted /dev/mmcblk0 resizepart 2 100% && resize2fs /dev/mmcblk0p2 && touch /etc/expand-rootfs-done"
+RemainAfterExit=yes
+[Install]
+WantedBy=multi-user.target
+SERVICEEOF
+
+# Service pour débloquer le WiFi
 cat > /etc/systemd/system/unblock-rfkill.service << 'RFKILLEOF'
 [Unit]
 Description=Unblock WiFi rfkill at boot
@@ -16,7 +29,7 @@ ExecStart=/usr/sbin/rfkill unblock all
 WantedBy=multi-user.target
 RFKILLEOF
 
-# Service "intelligent" qui se lance au premier boot
+# Service de premier démarrage "intelligent"
 cat > /etc/systemd/system/runtipios-first-boot.service << 'BOOTSVCEOF'
 [Unit]
 Description=RuntipiOS First Boot Logic
@@ -29,7 +42,7 @@ Restart=on-failure
 WantedBy=multi-user.target
 BOOTSVCEOF
 
-# Service pour installer Runtipi (ne se lance pas tout seul)
+# Service d'installation de Runtipi
 cat > /etc/systemd/system/runtipi-installer.service << 'RUNTIPIEOF'
 [Unit]
 Description=Runtipi Automatic Installer
@@ -39,15 +52,4 @@ ExecStart=/bin/bash -c "curl -L https://setup.runtipi.io | bash"
 TimeoutStartSec=1800
 RUNTIPIEOF
 
-# Activation des services
-systemctl daemon-reload
-systemctl enable unblock-rfkill.service
-systemctl enable runtipios-first-boot.service
-systemctl enable avahi-daemon.service
-
-# Configuration des mises à jour automatiques si le paquet est listé
-if [ -f /etc/runtipios/config.yml ] && yq -e '.packages.install[] | select(. == "unattended-upgrades")' /etc/runtipios/config.yml > /dev/null; then
-    dpkg-reconfigure -plow unattended-upgrades
-fi
-
-echo "Configuration des services terminée."
+echo "Création des fichiers de service terminée."

@@ -1,23 +1,22 @@
 #!/bin/bash
-# Script d'installation de Balena WiFi-Connect - Version finale (Logo, Multilingue, Message SSH)
+# Script d'installation de WiFi-Connect - Version Chroot-safe
 set -e
 exec > >(tee -a /var/log/install-wifi-connect.log) 2>&1
 
-echo "======================================================="
-echo "Installation de Balena WiFi-Connect - RuntipiOS"
-echo "Logs complets dans /var/log/install-wifi-connect.log"
-echo "======================================================="
+echo "Installation de Balena WiFi-Connect"
 
-CONFIG_FILE="/tmp/config.yml"
-eval "$(yq -o=shell "$CONFIG_FILE")"
+# --- Arguments ---
+WIFI_CONNECT_VERSION=$1
+RASPIOS_ARCH=$2
+PORTAL_SSID=$3
 
 TARGET_ARCH=""
-case "$raspios_arch" in
+case "$RASPIOS_ARCH" in
     "armhf") TARGET_ARCH="armv7hf" ;;
     "arm64") TARGET_ARCH="aarch64" ;;
 esac
 
-DOWNLOAD_URL="https://github.com/balena-io/wifi-connect/releases/download/v${wifi_connect_version}/wifi-connect-v${wifi_connect_version}-linux-${TARGET_ARCH}.zip"
+DOWNLOAD_URL="https://github.com/balena-io/wifi-connect/releases/download/v${WIFI_CONNECT_VERSION}/wifi-connect-v${WIFI_CONNECT_VERSION}-linux-${TARGET_ARCH}.zip"
 
 cd /tmp
 curl -L --fail "$DOWNLOAD_URL" -o wc.zip
@@ -34,15 +33,12 @@ HTMLEOF
 cat > /usr/local/bin/runtipios-first-boot.sh << BOOTSCRIPT
 #!/bin/bash
 if [ -f /etc/runtipios/configured ]; then exit 0; fi
-echo "Vérification de la connectivité..."
 if nmcli -t g | grep -q "full"; then
-    echo "Connecté. Lancement de l'install Runtipi."
     touch /etc/runtipios/configured
     systemctl start runtipi-installer.service
     systemctl disable --now runtipios-first-boot.service
 else
-    echo "Pas de connexion. Lancement du portail WiFi."
-    exec /usr/local/bin/wifi-connect --portal-ssid "${wifi_connect_ssid}" --ui-directory "${UI_DIR}"
+    exec /usr/local/bin/wifi-connect --portal-ssid "${PORTAL_SSID}" --ui-directory "${UI_DIR}"
 fi
 BOOTSCRIPT
 chmod +x /usr/local/bin/runtipios-first-boot.sh

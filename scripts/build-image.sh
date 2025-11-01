@@ -1,5 +1,5 @@
 #!/bin/bash
-# RuntipiOS Image Builder - Version Corrigée avec chpasswd robuste
+# RuntipiOS Image Builder - Version Finale avec Toutes les Corrections
 set -euo pipefail
 
 # --- Fonctions de log ---
@@ -16,10 +16,18 @@ LOOP_DEVICE=""; USE_KPARTX=0; BOOT_PART=""; ROOT_PART=""; BASE_IMAGE=""
 # --- Fonction de Nettoyage Robuste ---
 cleanup() {
     set +e; log_info "Nettoyage en cours..."; sync
-    umount -l "${MOUNT_DIR}/dev/pts" 2>/dev/null; umount -l "${MOUNT_DIR}/dev" 2>/dev/null; umount -l "${MOUNT_DIR}/sys" 2>/dev/null; umount -l "${MOUNT_DIR}/proc" 2>/dev/null
-    umount -l "${MOUNT_DIR}/boot/firmware" 2>/dev/null; umount -l "${MOUNT_DIR}" 2>/dev/null
-    if [ "${USE_KPARTX}" = "1" ] && [ -n "${BASE_IMAGE}" ] && [ -f "${BASE_IMAGE}" ]; then kpartx -d "${BASE_IMAGE}" 2>/dev/null; fi
-    if [ -n "${LOOP_DEVICE}" ]; then losetup -d "${LOOP_DEVICE}" 2>/dev/null; fi
+    umount -l "${MOUNT_DIR}/dev/pts" 2>/dev/null
+    umount -l "${MOUNT_DIR}/dev" 2>/dev/null
+    umount -l "${MOUNT_DIR}/sys" 2>/dev/null
+    umount -l "${MOUNT_DIR}/proc" 2>/dev/null
+    umount -l "${MOUNT_DIR}/boot/firmware" 2>/dev/null
+    umount -l "${MOUNT_DIR}" 2>/dev/null
+    if [ "${USE_KPARTX}" = "1" ] && [ -n "${BASE_IMAGE}" ] && [ -f "${BASE_IMAGE}" ]; then
+        kpartx -d "${BASE_IMAGE}" 2>/dev/null
+    fi
+    if [ -n "${LOOP_DEVICE}" ]; then
+        losetup -d "${LOOP_DEVICE}" 2>/dev/null
+    fi
 }
 trap cleanup EXIT
 
@@ -48,7 +56,10 @@ mkdir -p "$WORK_DIR" "$MOUNT_DIR" "$OUTPUT_DIR"
 
 log_info "Téléchargement de Raspberry Pi OS..."
 BASE_IMAGE="${WORK_DIR}/raspios-base.img"
-if [ ! -f "$BASE_IMAGE" ]; then wget -O "${BASE_IMAGE}.xz" "$CONFIG_raspios_url" && xz -d -k "${BASE_IMAGE}.xz"; fi
+if [ ! -f "$BASE_IMAGE" ]; then
+    wget -O "${BASE_IMAGE}.xz" "$CONFIG_raspios_url"
+    xz -d -k "${BASE_IMAGE}.xz"
+fi
 
 log_info "Agrandissement de l'image à ${CONFIG_build_image_size}GB..."
 truncate -s "${CONFIG_build_image_size}G" "$BASE_IMAGE"
@@ -61,36 +72,53 @@ sleep 5
 
 if [ -e "${LOOP_DEVICE}p1" ] && [ -e "${LOOP_DEVICE}p2" ]; then
     log_info "Partitions détectées directement."
-    BOOT_PART="${LOOP_DEVICE}p1"; ROOT_PART="${LOOP_DEVICE}p2"; USE_KPARTX=0
+    BOOT_PART="${LOOP_DEVICE}p1"
+    ROOT_PART="${LOOP_DEVICE}p2"
+    USE_KPARTX=0
 else
-    log_warning "Utilisation de kpartx..."; USE_KPARTX=1
-    KPARTX_OUTPUT=$(kpartx -avs "$BASE_IMAGE"); sleep 5
+    log_warning "Utilisation de kpartx..."
+    USE_KPARTX=1
+    KPARTX_OUTPUT=$(kpartx -avs "$BASE_IMAGE")
+    sleep 5
     BOOT_MAPPER=$(echo "$KPARTX_OUTPUT" | awk '/^add map.*p1 / {print $3; exit}')
     ROOT_MAPPER=$(echo "$KPARTX_OUTPUT" | awk '/^add map.*p2 / {print $3; exit}')
-    if [ -z "$BOOT_MAPPER" ] || [ -z "$ROOT_MAPPER" ]; then log_error "Extraction mappers échouée."; echo "$KPARTX_OUTPUT"; exit 1; fi
-    BOOT_PART="/dev/mapper/${BOOT_MAPPER}"; ROOT_PART="/dev/mapper/${ROOT_MAPPER}"
+    if [ -z "$BOOT_MAPPER" ] || [ -z "$ROOT_MAPPER" ]; then
+        log_error "Extraction mappers échouée."
+        echo "$KPARTX_OUTPUT"
+        exit 1
+    fi
+    BOOT_PART="/dev/mapper/${BOOT_MAPPER}"
+    ROOT_PART="/dev/mapper/${ROOT_MAPPER}"
 fi
 
 log_info "Vérification..."
-if [ ! -b "${BOOT_PART}" ] || [ ! -b "${ROOT_PART}" ]; then log_error "Périphérique introuvable: ${BOOT_PART}, ${ROOT_PART}"; ls -la /dev/mapper; exit 1; fi
+if [ ! -b "${BOOT_PART}" ] || [ ! -b "${ROOT_PART}" ]; then
+    log_error "Périphérique introuvable: ${BOOT_PART}, ${ROOT_PART}"
+    ls -la /dev/mapper
+    exit 1
+fi
 log_success "Périphériques trouvés !"
 
-mount "$ROOT_PART" "$MOUNT_DIR"; mkdir -p "${MOUNT_DIR}/boot/firmware"; mount "$BOOT_PART" "${MOUNT_DIR}/boot/firmware"
+mount "$ROOT_PART" "$MOUNT_DIR"
+mkdir -p "${MOUNT_DIR}/boot/firmware"
+mount "$BOOT_PART" "${MOUNT_DIR}/boot/firmware"
 log_success "Partitions montées."
 
-# --- Chroot avec /dev/pts CORRECTEMENT monté ---
+# --- Chroot avec /dev/pts ---
 log_info "Préparation du chroot..."
 cp /etc/resolv.conf "${MOUNT_DIR}/etc/"
-if [ "$(uname -m)" != "$TARGET_ARCH" ]; then cp "/usr/bin/qemu-aarch64-static" "${MOUNT_DIR}/usr/bin/"; fi
+if [ "$(uname -m)" != "$TARGET_ARCH" ]; then
+    cp "/usr/bin/qemu-aarch64-static" "${MOUNT_DIR}/usr/bin/"
+fi
 
 mount -t proc proc "${MOUNT_DIR}/proc"
 mount -t sysfs sys "${MOUNT_DIR}/sys"
 mount -o bind /dev "${MOUNT_DIR}/dev"
-mount -t devpts devpts "${MOUNT_DIR}/dev/pts"  # ← CORRECTION CRITIQUE
+mount -t devpts devpts "${MOUNT_DIR}/dev/pts"
 
-log_success "Chroot préparé avec /dev/pts monté"
+log_success "Chroot préparé"
 
-# --- Script de personnalisation CORRIGÉ ---
+# --- Script de personnalisation ---
 log_info "Génération du script de personnalisation..."
 cat > "${MOUNT_DIR}/tmp/run.sh" <<'EOF'
 #!/bin/bash
@@ -108,10 +136,22 @@ echo "============================================"
 echo "[CHROOT] Configuration système..."
 echo "${CONFIG_system_hostname}" > /etc/hostname
 rm -f /etc/localtime && ln -sf "/usr/share/zoneinfo/${CONFIG_system_timezone}" /etc/localtime
+
+# Configuration des locales (MÉTHODE ROBUSTE)
+echo "[CHROOT] Configuration des locales..."
 echo "LANG=${CONFIG_system_locale}" > /etc/default/locale
-sed -i "s/^# *${CONFIG_system_locale}/${CONFIG_system_locale}/" /etc/locale.gen && locale-gen
+
+# Échapper le point dans le locale pour sed
+LOCALE_ESCAPED=$(echo "${CONFIG_system_locale}" | sed 's/\./\\./g')
+sed -i "s/^# *${LOCALE_ESCAPED} UTF-8/${CONFIG_system_locale} UTF-8/" /etc/locale.gen
+
+echo "[CHROOT] Génération des locales..."
+locale-gen
+echo "[CHROOT] ✓ Locales configurés"
+
 sed -i "s/XKBLAYOUT=.*/XKBLAYOUT=\"${CONFIG_system_keyboard_layout}\"/" /etc/default/keyboard
 raspi-config nonint do_wifi_country "${CONFIG_system_wifi_country}"
+echo "[CHROOT] ✓ Configuration système terminée"
 
 echo "[CHROOT] Nettoyage et mise à jour..."
 rm -f /etc/xdg/autostart/piwiz.desktop
@@ -137,7 +177,7 @@ else
     useradd -m -s /bin/bash -G sudo,netdev "${CONFIG_system_default_user}"
 fi
 
-# CORRECTION CRITIQUE : Utiliser usermod pour définir le mot de passe de manière robuste
+# Configuration du mot de passe
 echo "[CHROOT] Configuration du mot de passe..."
 echo "${CONFIG_system_default_user}:${CONFIG_system_default_password}" | chpasswd
 
@@ -145,7 +185,6 @@ echo "${CONFIG_system_default_user}:${CONFIG_system_default_password}" | chpassw
 if id "${CONFIG_system_default_user}" &>/dev/null; then
     echo "[CHROOT] ✓ Utilisateur créé avec succès"
     echo "[CHROOT] UID: $(id -u ${CONFIG_system_default_user})"
-    echo "[CHROOT] GID: $(id -g ${CONFIG_system_default_user})"
     echo "[CHROOT] Groupes: $(groups ${CONFIG_system_default_user})"
 else
     echo "[CHROOT] ✗ ERREUR: Utilisateur non créé!"
@@ -290,7 +329,7 @@ chmod +x "${MOUNT_DIR}/tmp/run.sh"
 log_info "Exécution du script de personnalisation..."
 chroot "$MOUNT_DIR" /bin/bash "/tmp/run.sh" || {
     log_error "Le script de personnalisation a échoué!"
-    log_error "Vérifiez le fichier de log dans l'image: /root/runtipios-build.log"
+    log_error "Vérifiez le fichier de log: /root/runtipios-build.log"
     exit 1
 }
 

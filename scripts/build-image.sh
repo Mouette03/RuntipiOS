@@ -140,15 +140,8 @@ rm -f /etc/localtime && ln -sf "/usr/share/zoneinfo/${CONFIG_system_timezone}" /
 # Configuration des locales (MÉTHODE ROBUSTE)
 echo "[CHROOT] Configuration des locales..."
 echo "LANG=${CONFIG_system_locale}" > /etc/default/locale
-
-# Échapper le point dans le locale pour sed
-LOCALE_ESCAPED=$(echo "${CONFIG_system_locale}" | sed 's/\./\\./g')
-sed -i "s/^# *${LOCALE_ESCAPED} UTF-8/${CONFIG_system_locale} UTF-8/" /etc/locale.gen
-
-echo "[CHROOT] Génération des locales..."
+echo "${CONFIG_system_locale} UTF-8" > /etc/locale.gen
 locale-gen
-echo "[CHROOT] ✓ Locales configurés"
-
 sed -i "s/XKBLAYOUT=.*/XKBLAYOUT=\"${CONFIG_system_keyboard_layout}\"/" /etc/default/keyboard
 raspi-config nonint do_wifi_country "${CONFIG_system_wifi_country}"
 echo "[CHROOT] ✓ Configuration système terminée"

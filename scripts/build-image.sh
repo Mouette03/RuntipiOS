@@ -1,5 +1,5 @@
 #!/bin/bash
-# RuntipiOS Image Builder - Version Finale avec MOTD Corrigé
+# RuntipiOS Image Builder - Version avec Montage Fiabilisé
 set -euo pipefail
 
 # --- Fonctions de log ---
@@ -23,7 +23,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# --- Parser YAML ---
+# --- Parser YAML (Hérité de votre version fonctionnelle) ---
 parse_yaml() {
     local prefix=$2; local s='[[:space:]]*'; local w='[a-zA-Z0-9_]*'; local fs; fs=$(echo @|tr @ '\034')
     sed -ne "s|^\($s\):|\1|" -e "s|^\($s\)\($w\)$s:$s[\"']\(.*\)[\"']$s$|\1$fs\2$fs\3|p" -e "s|^\($s\)\($w\)$s:$s\(.*\)$s$|\1$fs\2$fs\3|p" "$1" |
@@ -31,12 +31,12 @@ parse_yaml() {
 }
 
 # --- Démarrage du Build ---
-log_info "Chargement de la configuration..."
+log_info "Chargement de la configuration depuis ${CONFIG_FILE}..."
 if [ ! -f "$CONFIG_FILE" ]; then log_error "Fichier config.yml introuvable !"; exit 1; fi
 eval $(parse_yaml "$CONFIG_FILE" "CONFIG_")
 TARGET_ARCH="${CONFIG_raspios_arch}"
 
-log_info "Création des répertoires..."
+log_info "Création des répertoires de travail..."
 mkdir -p "$WORK_DIR" "$MOUNT_DIR" "$OUTPUT_DIR"
 
 log_info "Téléchargement de Raspberry Pi OS..."
@@ -47,27 +47,45 @@ log_info "Agrandissement de l'image à ${CONFIG_build_image_size}GB..."
 truncate -s "${CONFIG_build_image_size}G" "$BASE_IMAGE"
 parted -s "$BASE_IMAGE" resizepart 2 100%
 
-# --- Montage ---
+# --- Montage Robuste de l'Image ---
 log_info "Montage de l'image..."
 LOOP_DEVICE=$(losetup -f --show -P "$BASE_IMAGE")
-sleep 2
+
+# --- CORRECTION : PAUSE ET VÉRIFICATION ---
+log_info "Attente de la disponibilité des partitions..."
+sleep 5 # Pause de 5 secondes pour laisser le temps au noyau
+
 if [ -e "${LOOP_DEVICE}p1" ] && [ -e "${LOOP_DEVICE}p2" ]; then
+    log_info "Partitions détectées directement via losetup."
     BOOT_PART="${LOOP_DEVICE}p1"; ROOT_PART="${LOOP_DEVICE}p2"; USE_KPARTX=0
 else
-    log_warning "Utilisation de kpartx..."; USE_KPARTX=1
-    KPARTX_OUTPUT=$(kpartx -avs "$BASE_IMAGE"); sleep 3
+    log_warning "Partitions non détectées, utilisation de kpartx..."; USE_KPARTX=1
+    KPARTX_OUTPUT=$(kpartx -avs "$BASE_IMAGE")
+    sleep 5 # Pause supplémentaire après kpartx
     BOOT_MAPPER=$(echo "$KPARTX_OUTPUT" | awk '/p1/{print $3}'); ROOT_MAPPER=$(echo "$KPARTX_OUTPUT" | awk '/p2/{print $3}')
     BOOT_PART="/dev/mapper/${BOOT_MAPPER}"; ROOT_PART="/dev/mapper/${ROOT_MAPPER}"
 fi
-mount "$ROOT_PART" "$MOUNT_DIR"; mkdir -p "${MOUNT_DIR}/boot/firmware"; mount "$BOOT_PART" "${MOUNT_DIR}/boot/firmware"
 
-# --- Chroot ---
+log_info "Vérification de l'existence des périphériques de partitions..."
+if [ ! -b "${BOOT_PART}" ] || [ ! -b "${ROOT_PART}" ]; then
+    log_error "Le périphérique de partition boot ou root est introuvable."
+    log_error "Boot: ${BOOT_PART}, Root: ${ROOT_PART}"
+    log_error "Contenu de /dev/mapper/ :"
+    ls -la /dev/mapper
+    exit 1
+fi
+log_success "Périphériques de partitions trouvés !"
+
+mount "$ROOT_PART" "$MOUNT_DIR"; mkdir -p "${MOUNT_DIR}/boot/firmware"; mount "$BOOT_PART" "${MOUNT_DIR}/boot/firmware"
+log_success "Partitions montées avec succès."
+
+# --- Préparation du Chroot ---
 log_info "Préparation du chroot..."
 cp /etc/resolv.conf "${MOUNT_DIR}/etc/"; if [ "$(uname -m)" != "$TARGET_ARCH" ]; then cp "/usr/bin/qemu-aarch64-static" "${MOUNT_DIR}/usr/bin/"; fi
 mount -t proc proc "${MOUNT_DIR}/proc"; mount -t sysfs sys "${MOUNT_DIR}/sys"; mount -o bind /dev "${MOUNT_DIR}/dev"
 
-# --- Script de personnalisation ---
-log_info "Exécution de la personnalisation..."
+# --- Injection et Exécution du Script de Personnalisation ---
+log_info "Génération et exécution du script de personnalisation dans le chroot..."
 cat > "${MOUNT_DIR}/tmp/run.sh" <<EOF
 #!/bin/bash
 set -e
@@ -138,7 +156,7 @@ cat > /etc/motd << 'MOTDEOF'
 ║                                                                       ║
 ╠═══════════════════════════════════════════════════════════════════════╣
 ║  \033[1;33m⚠️  IMPORTANT : Changez votre mot de passe SSH par défaut !\033[1;34m         ║
-║       \033[1;37mPour cela, tapez simplement la commande : \033[1;36m\`passwd\`\033[1;34m             ║
+║       \033[1;37mPour cela, tapez simplement la commande : \033[1;36m`passwd`\033[1;34m             ║
 ╠═══════════════════════════════════════════════════════════════════════╣
 ║   \033[1;37m🌐 Accès Web: \033[4;36mhttp://runtipios.local\033[0m\033[1;34m (après installation)          ║
 ║   \033[1;37m🔐 Accès SSH: \033[4;36mssh ${CONFIG_system_default_user}@runtipios.local\033[0m\033[1;34m                          ║

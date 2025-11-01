@@ -137,11 +137,15 @@ echo "[CHROOT] Configuration système..."
 echo "${CONFIG_system_hostname}" > /etc/hostname
 rm -f /etc/localtime && ln -sf "/usr/share/zoneinfo/${CONFIG_system_timezone}" /etc/localtime
 
-# Configuration des locales (MÉTHODE ROBUSTE)
+# Configuration des locales
 echo "[CHROOT] Configuration des locales..."
 echo "LANG=${CONFIG_system_locale}" > /etc/default/locale
-echo "${CONFIG_system_locale} UTF-8" > /etc/locale.gen
+cat > /etc/locale.gen << 'LOCALE_EOF'
+fr_FR.UTF-8 UTF-8
+en_GB.UTF-8 UTF-8
+LOCALE_EOF
 locale-gen
+echo "[CHROOT] ✓ Locales générés"
 sed -i "s/XKBLAYOUT=.*/XKBLAYOUT=\"${CONFIG_system_keyboard_layout}\"/" /etc/default/keyboard
 raspi-config nonint do_wifi_country "${CONFIG_system_wifi_country}"
 echo "[CHROOT] ✓ Configuration système terminée"

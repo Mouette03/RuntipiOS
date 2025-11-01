@@ -294,14 +294,61 @@ echo "============================================"
 
 cat > /usr/local/bin/runtipios-first-boot.sh << 'BOOTEOF'
 #!/bin/bash
-if [ -f /etc/runtipi/configured ]; then exit 0; fi
-if nmcli -t g | grep -q "full"; then
-    touch /etc/runtipi/configured
+set -e
+
+# Fichier marqueur de configuration
+CONFIGURED="/etc/runtipi/configured"
+
+# Si déjà configuré, ne rien faire
+if [ -f "$CONFIGURED" ]; then
+    exit 0
+fi
+
+# Attendre que NetworkManager soit prêt
+echo "[RuntipiOS] Attente de NetworkManager..."
+for i in {1..30}; do
+    if systemctl is-active --quiet NetworkManager; then
+        break
+    fi
+    sleep 1
+done
+
+# Attendre un peu pour que les interfaces réseau soient détectées
+sleep 5
+
+# Vérifier si on a une connexion réseau (Ethernet ou WiFi)
+HAS_NETWORK=false
+
+# Vérifier Ethernet
+if ip link show eth0 2>/dev/null | grep -q "state UP"; then
+    echo "[RuntipiOS] Connexion Ethernet détectée"
+    HAS_NETWORK=true
+fi
+
+# Vérifier WiFi
+if nmcli -t -f GENERAL.STATE dev show wlan0 2>/dev/null | grep -q "100"; then
+    echo "[RuntipiOS] Connexion WiFi détectée"
+    HAS_NETWORK=true
+fi
+
+# Vérifier la connectivité globale
+if nmcli -t g 2>/dev/null | grep -q "full"; then
+    echo "[RuntipiOS] Connectivité complète détectée"
+    HAS_NETWORK=true
+fi
+
+# Si on a le réseau, lancer l'installation de Runtipi
+if [ "$HAS_NETWORK" = true ]; then
+    echo "[RuntipiOS] Démarrage de l'installation de Runtipi..."
+    touch "$CONFIGURED"
     systemctl start runtipi-installer.service
     systemctl disable --now runtipios-first-boot.service
-else
-    exec /usr/local/bin/wifi-connect --portal-ssid "${CONFIG_wifi_connect_ssid}" --ui-directory "/etc/runtipi/ui"
+    exit 0
 fi
+
+# Pas de réseau, lancer le portail WiFi
+echo "[RuntipiOS] Aucune connexion réseau, lancement du portail WiFi..."
+exec /usr/local/bin/wifi-connect --portal-ssid "${CONFIG_wifi_connect_ssid}" --ui-directory "/etc/runtipi/ui"
 BOOTEOF
 chmod +x /usr/local/bin/runtipios-first-boot.sh
 
@@ -309,19 +356,81 @@ cat > /etc/systemd/system/expand-rootfs.service <<'E1'
 [Unit]
 Description=Expand Root Filesystem on First Boot
 ConditionPathExists=!/etc/runtipi/expand-done
+Before=runtipios-first-boot.service
 [Service]
 Type=oneshot
-ExecStart=/bin/bash -c "parted /dev/mmcblk0 resizepart 2 100% && resize2fs /dev/mmcblk0p2 && touch /etc/runtipi/expand-done"
+ExecStart=/usr/local/bin/expand-rootfs.sh
+StandardOutput=journal+console
+StandardError=journal+console
 [Install]
 WantedBy=multi-user.target
 E1
 
+cat > /usr/local/bin/expand-rootfs.sh <<'EXPAND'
+#!/bin/bash
+set -e
+
+echo "[RuntipiOS] Expansion du système de fichiers..."
+
+# Détecter le périphérique racine
+ROOT_PART=$(findmnt -n -o SOURCE /)
+ROOT_DEV=$(lsblk -no pkname "$ROOT_PART" 2>/dev/null || echo "")
+
+if [ -z "$ROOT_DEV" ]; then
+    echo "[RuntipiOS] ⚠ Impossible de détecter le périphérique racine, tentative avec mmcblk0..."
+    ROOT_DEV="mmcblk0"
+fi
+
+DEVICE="/dev/$ROOT_DEV"
+
+echo "[RuntipiOS] Périphérique détecté: $DEVICE"
+echo "[RuntipiOS] Partition racine: $ROOT_PART"
+
+# Déterminer le numéro de partition
+if [[ "$ROOT_PART" =~ mmcblk0p([0-9]+) ]]; then
+    PART_NUM="${BASH_REMATCH[1]}"
+elif [[ "$ROOT_PART" =~ sd[a-z]([0-9]+) ]]; then
+    PART_NUM="${BASH_REMATCH[1]}"
+else
+    echo "[RuntipiOS] ⚠ Impossible de détecter le numéro de partition"
+    PART_NUM="2"
+fi
+
+echo "[RuntipiOS] Numéro de partition: $PART_NUM"
+
+# Agrandir la partition
+if parted "$DEVICE" resizepart "$PART_NUM" 100%; then
+    echo "[RuntipiOS] ✓ Partition agrandie"
+else
+    echo "[RuntipiOS] ⚠ Échec de l'agrandissement de la partition (peut-être déjà agrandi)"
+fi
+
+# Agrandir le système de fichiers
+if resize2fs "$ROOT_PART"; then
+    echo "[RuntipiOS] ✓ Système de fichiers agrandi"
+else
+    echo "[RuntipiOS] ⚠ Échec de l'agrandissement du système de fichiers"
+fi
+
+# Marquer comme fait
+mkdir -p /etc/runtipi
+touch /etc/runtipi/expand-done
+echo "[RuntipiOS] ✓ Expansion terminée"
+EXPAND
+chmod +x /usr/local/bin/expand-rootfs.sh
+
 cat > /etc/systemd/system/runtipios-first-boot.service <<'E2'
 [Unit]
 Description=RuntipiOS First Boot Logic
-After=network-online.target
+After=network-online.target NetworkManager.service
+Wants=network-online.target
+Before=getty@tty1.service
 [Service]
+Type=oneshot
 ExecStart=/usr/local/bin/runtipios-first-boot.sh
+RemainAfterExit=yes
+StandardOutput=journal+console
+StandardError=journal+console
 [Install]
 WantedBy=multi-user.target
 E2

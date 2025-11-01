@@ -118,6 +118,25 @@ mount -t devpts devpts "${MOUNT_DIR}/dev/pts"
 
 log_success "Chroot préparé"
 
+# --- Injection de la configuration ---
+log_info "Injection de la configuration dans l'image..."
+cat > "${MOUNT_DIR}/tmp/runtipios.conf" <<EOF
+CONFIG_system_hostname="${CONFIG_system_hostname}"
+CONFIG_system_timezone="${CONFIG_system_timezone}"
+CONFIG_system_locale="${CONFIG_system_locale}"
+CONFIG_system_keyboard_layout="${CONFIG_system_keyboard_layout}"
+CONFIG_system_wifi_country="${CONFIG_system_wifi_country}"
+CONFIG_system_default_user="${CONFIG_system_default_user}"
+CONFIG_system_default_password="${CONFIG_system_default_password}"
+CONFIG_system_autologin="${CONFIG_system_autologin}"
+CONFIG_raspios_arch="${CONFIG_raspios_arch}"
+CONFIG_wifi_connect_version="${CONFIG_wifi_connect_version}"
+CONFIG_wifi_connect_ssid="${CONFIG_wifi_connect_ssid}"
+CONFIG_packages_install="${CONFIG_packages_install}"
+CONFIG_packages_remove="${CONFIG_packages_remove}"
+EOF
+log_success "Configuration injectée"
+
 # --- Script de personnalisation ---
 log_info "Génération du script de personnalisation..."
 cat > "${MOUNT_DIR}/tmp/run.sh" <<'EOF'
@@ -132,6 +151,16 @@ echo "============================================"
 echo "[CHROOT] Démarrage de la personnalisation"
 echo "[CHROOT] Date: $(date)"
 echo "============================================"
+
+# Charger la configuration
+if [ -f /tmp/runtipios.conf ]; then
+    echo "[CHROOT] Chargement de la configuration..."
+    source /tmp/runtipios.conf
+    echo "[CHROOT] ✓ Configuration chargée"
+else
+    echo "[CHROOT] ✗ ERREUR: Fichier de configuration introuvable!"
+    exit 1
+fi
 
 echo "[CHROOT] Configuration système..."
 echo "${CONFIG_system_hostname}" > /etc/hostname

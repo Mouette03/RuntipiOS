@@ -146,8 +146,17 @@ en_GB.UTF-8 UTF-8
 LOCALE_EOF
 locale-gen
 echo "[CHROOT] ✓ Locales générés"
+
+echo "[CHROOT] Configuration du clavier..."
 sed -i "s/XKBLAYOUT=.*/XKBLAYOUT=\"${CONFIG_system_keyboard_layout}\"/" /etc/default/keyboard
-raspi-config nonint do_wifi_country "${CONFIG_system_wifi_country}"
+echo "[CHROOT] ✓ Clavier configuré"
+
+echo "[CHROOT] Configuration du pays WiFi..."
+raspi-config nonint do_wifi_country "${CONFIG_system_wifi_country}" || echo "[CHROOT] ⚠ Impossible de configurer le pays WiFi via raspi-config, utilisation alternative..."
+# Alternative si raspi-config échoue
+echo "country=${CONFIG_system_wifi_country}" > /etc/wpa_supplicant/wpa_supplicant.conf
+echo "[CHROOT] ✓ Pays WiFi configuré"
+
 echo "[CHROOT] ✓ Configuration système terminée"
 
 echo "[CHROOT] Nettoyage et mise à jour..."

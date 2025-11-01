@@ -64,11 +64,18 @@ cleanup; trap - EXIT
 
 FINAL_IMAGE="${OUTPUT_DIR}/${OUTPUT_NAME}.img"
 mv "$BASE_IMAGE" "$FINAL_IMAGE"
+
+log_info "Vérification de la compression..."
+log_info "BUILD_COMPRESS = ${BUILD_COMPRESS}"
+log_info "BUILD_COMPRESSION_FORMAT = ${BUILD_COMPRESSION_FORMAT}"
+
 if [ "$BUILD_COMPRESS" = "true" ]; then
+    log_info "Compression de l'image en .${BUILD_COMPRESSION_FORMAT}..."
     case "$BUILD_COMPRESSION_FORMAT" in
         xz) xz -T0 "$FINAL_IMAGE" ;;
         gz) gzip "$FINAL_IMAGE" ;;
         zip) zip -j "${FINAL_IMAGE}.zip" "$FINAL_IMAGE" && rm "$FINAL_IMAGE" ;;
     esac
 fi
+
 log_success "Build terminé avec succès !"

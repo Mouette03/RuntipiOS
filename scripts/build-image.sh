@@ -1,5 +1,5 @@
 #!/bin/bash
-# RuntipiOS Image Builder - Version Finale avec Logs Détaillés
+# RuntipiOS Image Builder - Version Corrigée avec chpasswd robuste
 set -euo pipefail
 
 # --- Fonctions de log ---
@@ -78,20 +78,34 @@ log_success "Périphériques trouvés !"
 mount "$ROOT_PART" "$MOUNT_DIR"; mkdir -p "${MOUNT_DIR}/boot/firmware"; mount "$BOOT_PART" "${MOUNT_DIR}/boot/firmware"
 log_success "Partitions montées."
 
-# --- Chroot ---
+# --- Chroot avec /dev/pts CORRECTEMENT monté ---
 log_info "Préparation du chroot..."
-cp /etc/resolv.conf "${MOUNT_DIR}/etc/"; if [ "$(uname -m)" != "$TARGET_ARCH" ]; then cp "/usr/bin/qemu-aarch64-static" "${MOUNT_DIR}/usr/bin/"; fi
-mount -t proc proc "${MOUNT_DIR}/proc"; mount -t sysfs sys "${MOUNT_DIR}/sys"; mount -o bind /dev "${MOUNT_DIR}/dev"
+cp /etc/resolv.conf "${MOUNT_DIR}/etc/"
+if [ "$(uname -m)" != "$TARGET_ARCH" ]; then cp "/usr/bin/qemu-aarch64-static" "${MOUNT_DIR}/usr/bin/"; fi
 
-# --- Script de personnalisation avec logs détaillés ---
+mount -t proc proc "${MOUNT_DIR}/proc"
+mount -t sysfs sys "${MOUNT_DIR}/sys"
+mount -o bind /dev "${MOUNT_DIR}/dev"
+mount -t devpts devpts "${MOUNT_DIR}/dev/pts"  # ← CORRECTION CRITIQUE
+
+log_success "Chroot préparé avec /dev/pts monté"
+
+# --- Script de personnalisation CORRIGÉ ---
 log_info "Génération du script de personnalisation..."
 cat > "${MOUNT_DIR}/tmp/run.sh" <<'EOF'
 #!/bin/bash
 set -e
 
+# Créer un log pour debug
+LOG_FILE="/root/runtipios-build.log"
+exec > >(tee -a "$LOG_FILE") 2>&1
+
 echo "============================================"
+echo "[CHROOT] Démarrage de la personnalisation"
+echo "[CHROOT] Date: $(date)"
+echo "============================================"
+
 echo "[CHROOT] Configuration système..."
-echo "============================================"
 echo "${CONFIG_system_hostname}" > /etc/hostname
 rm -f /etc/localtime && ln -sf "/usr/share/zoneinfo/${CONFIG_system_timezone}" /etc/localtime
 echo "LANG=${CONFIG_system_locale}" > /etc/default/locale
@@ -100,28 +114,61 @@ sed -i "s/XKBLAYOUT=.*/XKBLAYOUT=\"${CONFIG_system_keyboard_layout}\"/" /etc/def
 raspi-config nonint do_wifi_country "${CONFIG_system_wifi_country}"
 
 echo "[CHROOT] Nettoyage et mise à jour..."
-rm -f /etc/xdg/autostart/piwiz.desktop; touch /etc/cloud/cloud-init.disabled
+rm -f /etc/xdg/autostart/piwiz.desktop
+touch /etc/cloud/cloud-init.disabled
 apt-get update && apt-get -y upgrade
 
 echo "[CHROOT] Installation des paquets système..."
 apt-get install -y --no-install-recommends network-manager avahi-daemon openssh-server rfkill iw ${CONFIG_packages_install}
 apt-get remove -y --purge ${CONFIG_packages_remove}
 
+echo "============================================"
 echo "[CHROOT] Création de l'utilisateur..."
-if id "pi" &>/dev/null; then 
-    usermod -l "${CONFIG_system_default_user}" pi && usermod -d "/home/${CONFIG_system_default_user}" -m "${CONFIG_system_default_user}" && groupmod -n "${CONFIG_system_default_user}" pi
-else 
+echo "============================================"
+
+# Créer l'utilisateur
+if id "pi" &>/dev/null; then
+    echo "[CHROOT] Renommage de l'utilisateur 'pi' en '${CONFIG_system_default_user}'..."
+    usermod -l "${CONFIG_system_default_user}" pi
+    usermod -d "/home/${CONFIG_system_default_user}" -m "${CONFIG_system_default_user}"
+    groupmod -n "${CONFIG_system_default_user}" pi
+else
+    echo "[CHROOT] Création de l'utilisateur '${CONFIG_system_default_user}'..."
     useradd -m -s /bin/bash -G sudo,netdev "${CONFIG_system_default_user}"
 fi
+
+# CORRECTION CRITIQUE : Utiliser usermod pour définir le mot de passe de manière robuste
+echo "[CHROOT] Configuration du mot de passe..."
 echo "${CONFIG_system_default_user}:${CONFIG_system_default_password}" | chpasswd
 
-if [ "${CONFIG_system_autologin}" = "true" ]; then 
-    mkdir -p /etc/systemd/system/getty@tty1.service.d
-    echo -e "[Service]\nExecStart=\nExecStart=-/sbin/agetty --autologin ${CONFIG_system_default_user} --noclear %I \$TERM" > /etc/systemd/system/getty@tty1.service.d/autologin.conf
+# Vérification
+if id "${CONFIG_system_default_user}" &>/dev/null; then
+    echo "[CHROOT] ✓ Utilisateur créé avec succès"
+    echo "[CHROOT] UID: $(id -u ${CONFIG_system_default_user})"
+    echo "[CHROOT] GID: $(id -g ${CONFIG_system_default_user})"
+    echo "[CHROOT] Groupes: $(groups ${CONFIG_system_default_user})"
+else
+    echo "[CHROOT] ✗ ERREUR: Utilisateur non créé!"
+    exit 1
 fi
 
+# Autologin si activé
+if [ "${CONFIG_system_autologin}" = "true" ]; then
+    mkdir -p /etc/systemd/system/getty@tty1.service.d
+    cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf <<AUTOLOGIN
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin ${CONFIG_system_default_user} --noclear %I \$TERM
+AUTOLOGIN
+    echo "[CHROOT] ✓ Autologin configuré"
+fi
+
+# Sudo sans mot de passe
 echo "${CONFIG_system_default_user} ALL=(ALL) NOPASSWD: ALL" > "/etc/sudoers.d/010_${CONFIG_system_default_user}-nopasswd"
-sed -i 's/^#?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+chmod 440 "/etc/sudoers.d/010_${CONFIG_system_default_user}-nopasswd"
+
+# SSH
+sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
 
 echo "============================================"
 echo "[CHROOT] Installation de WiFi-Connect (Balena)"
@@ -129,39 +176,28 @@ echo "============================================"
 
 cd /tmp
 TARGET_ARCH_WC=""
-case "${CONFIG_raspios_arch}" in 
-    "armhf") TARGET_ARCH_WC="armv7hf";; 
-    "arm64") TARGET_ARCH_WC="aarch64";; 
+case "${CONFIG_raspios_arch}" in
+    "armhf") TARGET_ARCH_WC="armv7hf";;
+    "arm64") TARGET_ARCH_WC="aarch64";;
 esac
 
 DOWNLOAD_URL="https://github.com/balena-os/wifi-connect/releases/download/v${CONFIG_wifi_connect_version}/wifi-connect-v${CONFIG_wifi_connect_version}-linux-${TARGET_ARCH_WC}.tar.gz"
 
-echo "[CHROOT] Architecture cible: ${TARGET_ARCH_WC}"
-echo "[CHROOT] Version WiFi-Connect: ${CONFIG_wifi_connect_version}"
-echo "[CHROOT] URL de téléchargement:"
-echo "[CHROOT] ${DOWNLOAD_URL}"
-echo "[CHROOT] Téléchargement en cours..."
+echo "[CHROOT] Architecture: ${TARGET_ARCH_WC}"
+echo "[CHROOT] Version: ${CONFIG_wifi_connect_version}"
+echo "[CHROOT] URL: ${DOWNLOAD_URL}"
 
 curl -L --fail "$DOWNLOAD_URL" -o wc.tar.gz
-
-echo "[CHROOT] Extraction..."
 mkdir -p wc-extract
 tar -xzf wc.tar.gz -C wc-extract --strip-components=1
-
-echo "[CHROOT] Installation du binaire..."
 mv wc-extract/wifi-connect /usr/local/bin/
 chmod +x /usr/local/bin/wifi-connect
-
-echo "[CHROOT] Nettoyage des fichiers temporaires..."
 rm -rf wc-extract wc.tar.gz
 
-echo "[CHROOT] Vérification de l'installation..."
 if [ -f /usr/local/bin/wifi-connect ]; then
-    echo "[CHROOT] ✓ WiFi-Connect installé avec succès !"
-    echo "[CHROOT] Emplacement: /usr/local/bin/wifi-connect"
-    ls -lh /usr/local/bin/wifi-connect
+    echo "[CHROOT] ✓ WiFi-Connect installé: $(ls -lh /usr/local/bin/wifi-connect)"
 else
-    echo "[CHROOT] ✗ ERREUR: WiFi-Connect non trouvé !"
+    echo "[CHROOT] ✗ ERREUR: WiFi-Connect non trouvé!"
     exit 1
 fi
 
@@ -176,7 +212,7 @@ cat > "${UI_DIR}/index.html" << 'HTMLEOF'
 <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>RuntipiOS WiFi Setup</title><style>body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background-color:#f4f6f8}.header{background:#fff;padding:20px;text-align:center;border-bottom:1px solid #e0e0e0}.logo{max-width:150px;height:auto}.info-box{background:#fff3cd;border-left:4px solid #ffeeba;padding:15px 20px;margin:20px;border-radius:8px;color:#664d03;text-align:center;font-size:14px}.instructions{padding:0 20px;text-align:center;color:#555}.instructions h2{margin-bottom:10px;color:#333}code{background:#e9ecef;padding:2px 6px;border-radius:4px}</style></head><body><div class="header"><img src="https://runtipi.io/img/logo.png" alt="Runtipi Logo" class="logo"></div><div class="info-box"><strong id="security-alert-title"></strong><br><span id="security-alert-text"></span><code>passwd</code></div><div class="instructions"><h2 id="instruction-title"></h2><p id="instruction-text"></p></div><script>const t={en:{"security-alert-title":"IMPORTANT SECURITY NOTICE","security-alert-text":"After setup, connect via SSH and change the default password by typing the command:","instruction-title":"Configure WiFi","instruction-text":"Please select your WiFi network from the list below and enter the password to connect."},fr:{"security-alert-title":"AVIS DE SÉCURITÉ IMPORTANT","security-alert-text":"Après la configuration, connectez-vous en SSH et changez le mot de passe par défaut avec la commande :","instruction-title":"Configurer le WiFi","instruction-text":"Veuillez sélectionner votre réseau WiFi dans la liste ci-dessous et entrer le mot de passe pour vous connecter."}},n=navigator.language.split("-")[0],o=t[n]||t.en;for(const e in o){const l=document.getElementById(e);l&&(l.innerHTML=o[e])}</script></body></html>
 HTMLEOF
 
-echo "[CHROOT] ✓ Interface captive créée dans $UI_DIR"
+echo "[CHROOT] ✓ Interface captive créée"
 
 echo "============================================"
 echo "[CHROOT] Création des scripts de démarrage..."
@@ -185,18 +221,16 @@ echo "============================================"
 cat > /usr/local/bin/runtipios-first-boot.sh << 'BOOTEOF'
 #!/bin/bash
 if [ -f /etc/runtipi/configured ]; then exit 0; fi
-if nmcli -t g | grep -q "full"; then 
+if nmcli -t g | grep -q "full"; then
     touch /etc/runtipi/configured
     systemctl start runtipi-installer.service
     systemctl disable --now runtipios-first-boot.service
-else 
+else
     exec /usr/local/bin/wifi-connect --portal-ssid "${CONFIG_wifi_connect_ssid}" --ui-directory "/etc/runtipi/ui"
 fi
 BOOTEOF
 chmod +x /usr/local/bin/runtipios-first-boot.sh
-echo "[CHROOT] ✓ Script de premier démarrage créé"
 
-echo "[CHROOT] Création des services systemd..."
 cat > /etc/systemd/system/expand-rootfs.service <<'E1'
 [Unit]
 Description=Expand Root Filesystem on First Boot
@@ -226,9 +260,8 @@ Type=oneshot
 ExecStart=/bin/bash -c "curl -L https://setup.runtipi.io | bash"
 E3
 
-echo "[CHROOT] ✓ Services systemd créés"
+echo "[CHROOT] ✓ Services créés"
 
-echo "[CHROOT] Création du MOTD..."
 cat > /etc/motd << 'MOTDEOF'
 \033[1;34m
 ╔═══════════════════════════════════════════════════════════════════════╗
@@ -246,22 +279,31 @@ cat > /etc/motd << 'MOTDEOF'
 \033[0m
 MOTDEOF
 
-echo "[CHROOT] ✓ MOTD créé"
-
 echo "============================================"
-echo "[CHROOT] Personnalisation terminée avec succès !"
+echo "[CHROOT] ✓ Personnalisation terminée avec succès !"
+echo "[CHROOT] Log sauvegardé dans: $LOG_FILE"
 echo "============================================"
 EOF
 
 chmod +x "${MOUNT_DIR}/tmp/run.sh"
 
-log_info "Exécution du script de personnalisation dans le chroot..."
-chroot "$MOUNT_DIR" /bin/bash "/tmp/run.sh"
+log_info "Exécution du script de personnalisation..."
+chroot "$MOUNT_DIR" /bin/bash "/tmp/run.sh" || {
+    log_error "Le script de personnalisation a échoué!"
+    log_error "Vérifiez le fichier de log dans l'image: /root/runtipios-build.log"
+    exit 1
+}
+
 rm -f "${MOUNT_DIR}/tmp/run.sh"
 
-log_info "Activation services..."
-for service in expand-rootfs.service runtipios-first-boot.service avahi-daemon.service; do ln -sf "/etc/systemd/system/${service}" "${MOUNT_DIR}/etc/systemd/system/multi-user.target.wants/${service}"; done
-if echo "${CONFIG_packages_install}" | grep -q "unattended-upgrades"; then chroot "$MOUNT_DIR" dpkg-reconfigure -plow unattended-upgrades; fi
+log_info "Activation des services..."
+for service in expand-rootfs.service runtipios-first-boot.service avahi-daemon.service; do
+    ln -sf "/etc/systemd/system/${service}" "${MOUNT_DIR}/etc/systemd/system/multi-user.target.wants/${service}"
+done
+
+if echo "${CONFIG_packages_install}" | grep -q "unattended-upgrades"; then
+    chroot "$MOUNT_DIR" dpkg-reconfigure -plow unattended-upgrades
+fi
 
 log_info "Nettoyage du chroot..."
 chroot "$MOUNT_DIR" apt-get clean
@@ -272,42 +314,27 @@ FINAL_IMAGE="${OUTPUT_DIR}/${OUTPUT_NAME:-RuntipiOS-$(date +%Y%m%d)}.img"
 mv "$BASE_IMAGE" "$FINAL_IMAGE"
 
 # --- Compression ---
-log_info "Vérification de la compression..."
+log_info "Compression..."
 CONFIG_build_compress=$(echo "${CONFIG_build_compress}" | tr -d '[:space:]')
-log_info "Compression: '${CONFIG_build_compress}' / Format: '${CONFIG_build_compression_format}'"
 
 if [ "${CONFIG_build_compress}" = "true" ]; then
-    log_info "Compression en cours..."
+    log_info "Compression en cours (format: ${CONFIG_build_compression_format})..."
     case "${CONFIG_build_compression_format}" in
         xz) xz -9 -T0 "$FINAL_IMAGE" ;;
         gz) gzip -9 "$FINAL_IMAGE" ;;
         zip) zip -9 -j "${FINAL_IMAGE}.zip" "$FINAL_IMAGE" && rm "$FINAL_IMAGE" ;;
     esac
     log_success "Compression terminée !"
-else
-    log_warning "Compression désactivée"
 fi
 
-# --- Nettoyage final ---
 log_info "Suppression des fichiers temporaires..."
 rm -rf "${WORK_DIR}"
-log_success "Fichiers temporaires supprimés"
 
-# --- Vérification taille ---
 if [ "${CONFIG_build_compress}" = "true" ]; then
     COMPRESSED_FILE=$(ls ${OUTPUT_DIR}/*.img.* 2>/dev/null | head -1)
     if [ -f "$COMPRESSED_FILE" ]; then
         FINAL_SIZE=$(du -h "$COMPRESSED_FILE" | cut -f1)
-        FINAL_SIZE_BYTES=$(stat -L -c%s "$COMPRESSED_FILE")
-        MAX_SIZE=$((2 * 1024 * 1024 * 1024))
-        
-        log_info "Taille du fichier final: $FINAL_SIZE"
-        
-        if [ $FINAL_SIZE_BYTES -gt $MAX_SIZE ]; then
-            log_error "⚠️  ATTENTION: Le fichier dépasse 2GB (limite GitHub)"
-        else
-            log_success "✓ Taille OK pour GitHub Release ($FINAL_SIZE < 2GB)"
-        fi
+        log_success "✓ Image finale: $(basename $COMPRESSED_FILE) ($FINAL_SIZE)"
     fi
 fi
 

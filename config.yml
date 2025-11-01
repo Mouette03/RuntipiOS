@@ -40,8 +40,8 @@ wifi_connect:
 
 # -- Options de build --
 build:
-  # Taille finale de l'image en Gigaoctets. 8Go est un bon compromis.
-  image_size: 8
+  # Taille finale de l'image en Gigaoctets. 4Go est un bon compromis.
+  image_size: 4
   # Format de compression de l'image finale (xz, gz, ou zip)
   compression_format: "xz"
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# RuntipiOS Image Builder - Version Finale, Unifiée et Robuste
+# RuntipiOS Image Builder - Version Finale avec Nettoyage Complet
 set -euo pipefail
 
 # --- Fonctions de log ---
@@ -23,7 +23,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# --- Parser YAML (Hérité de votre version fonctionnelle) ---
+# --- Parser YAML ---
 parse_yaml() {
     local prefix=$2; local s='[[:space:]]*'; local w='[a-zA-Z0-9_]*'; local fs; fs=$(echo @|tr @ '\034')
     sed -ne "s|^\($s\):|\1|" -e "s|^\($s\)\($w\)$s:$s[\"']\(.*\)[\"']$s$|\1$fs\2$fs\3|p" -e "s|^\($s\)\($w\)$s:$s\(.*\)$s$|\1$fs\2$fs\3|p" "$1" |
@@ -31,17 +31,19 @@ parse_yaml() {
 }
 
 # --- Démarrage du Build ---
-log_info "Chargement de la configuration depuis ${CONFIG_FILE}..."
+log_info "Chargement de la configuration..."
 if [ ! -f "$CONFIG_FILE" ]; then log_error "Fichier config.yml introuvable !"; exit 1; fi
 eval $(parse_yaml "$CONFIG_FILE" "CONFIG_")
 
-# --- CORRECTION : Initialiser les listes de paquets pour éviter l'erreur "unbound variable" ---
+# --- Initialiser les variables optionnelles ---
 : "${CONFIG_packages_install:=}"
 : "${CONFIG_packages_remove:=}"
+: "${CONFIG_build_compress:=true}"
+: "${CONFIG_build_compression_format:=xz}"
 
 TARGET_ARCH="${CONFIG_raspios_arch}"
 
-log_info "Création des répertoires de travail..."
+log_info "Création des répertoires..."
 mkdir -p "$WORK_DIR" "$MOUNT_DIR" "$OUTPUT_DIR"
 
 log_info "Téléchargement de Raspberry Pi OS..."
@@ -52,45 +54,36 @@ log_info "Agrandissement de l'image à ${CONFIG_build_image_size}GB..."
 truncate -s "${CONFIG_build_image_size}G" "$BASE_IMAGE"
 parted -s "$BASE_IMAGE" resizepart 2 100%
 
-# --- Montage Robuste de l'Image ---
+# --- Montage ---
 log_info "Montage de l'image..."
 LOOP_DEVICE=$(losetup -f --show -P "$BASE_IMAGE")
 sleep 5
 
 if [ -e "${LOOP_DEVICE}p1" ] && [ -e "${LOOP_DEVICE}p2" ]; then
-    log_info "Partitions détectées directement via losetup."
+    log_info "Partitions détectées directement."
     BOOT_PART="${LOOP_DEVICE}p1"; ROOT_PART="${LOOP_DEVICE}p2"; USE_KPARTX=0
 else
-    log_warning "Partitions non détectées, utilisation de kpartx..."; USE_KPARTX=1
+    log_warning "Utilisation de kpartx..."; USE_KPARTX=1
     KPARTX_OUTPUT=$(kpartx -avs "$BASE_IMAGE"); sleep 5
-    
     BOOT_MAPPER=$(echo "$KPARTX_OUTPUT" | awk '/^add map.*p1 / {print $3; exit}')
     ROOT_MAPPER=$(echo "$KPARTX_OUTPUT" | awk '/^add map.*p2 / {print $3; exit}')
-
-    if [ -z "$BOOT_MAPPER" ] || [ -z "$ROOT_MAPPER" ]; then
-        log_error "Impossible d'extraire les noms des mappers depuis kpartx."
-        log_info "Output kpartx complet:"; echo "$KPARTX_OUTPUT"; exit 1
-    fi
-    
+    if [ -z "$BOOT_MAPPER" ] || [ -z "$ROOT_MAPPER" ]; then log_error "Extraction mappers échouée."; echo "$KPARTX_OUTPUT"; exit 1; fi
     BOOT_PART="/dev/mapper/${BOOT_MAPPER}"; ROOT_PART="/dev/mapper/${ROOT_MAPPER}"
 fi
 
-log_info "Vérification de l'existence des périphériques de partitions..."
-if [ ! -b "${BOOT_PART}" ] || [ ! -b "${ROOT_PART}" ]; then
-    log_error "Le périphérique de partition boot ou root est introuvable."; log_error "Boot: ${BOOT_PART}, Root: ${ROOT_PART}"; log_error "Contenu de /dev/mapper/ :"; ls -la /dev/mapper; exit 1
-fi
-log_success "Périphériques de partitions trouvés !"
+log_info "Vérification..."
+if [ ! -b "${BOOT_PART}" ] || [ ! -b "${ROOT_PART}" ]; then log_error "Périphérique introuvable: ${BOOT_PART}, ${ROOT_PART}"; ls -la /dev/mapper; exit 1; fi
+log_success "Périphériques trouvés !"
 
 mount "$ROOT_PART" "$MOUNT_DIR"; mkdir -p "${MOUNT_DIR}/boot/firmware"; mount "$BOOT_PART" "${MOUNT_DIR}/boot/firmware"
-log_success "Partitions montées avec succès."
+log_success "Partitions montées."
 
-# --- Préparation du Chroot ---
+# --- Chroot ---
 log_info "Préparation du chroot..."
 cp /etc/resolv.conf "${MOUNT_DIR}/etc/"; if [ "$(uname -m)" != "$TARGET_ARCH" ]; then cp "/usr/bin/qemu-aarch64-static" "${MOUNT_DIR}/usr/bin/"; fi
 mount -t proc proc "${MOUNT_DIR}/proc"; mount -t sysfs sys "${MOUNT_DIR}/sys"; mount -o bind /dev "${MOUNT_DIR}/dev"
 
-# --- Injection et Exécution du Script de Personnalisation ---
-log_info "Génération et exécution du script de personnalisation dans le chroot..."
+log_info "Personnalisation..."
 cat > "${MOUNT_DIR}/tmp/run.sh" <<EOF
 #!/bin/bash
 set -e
@@ -173,13 +166,11 @@ chmod +x "${MOUNT_DIR}/tmp/run.sh"
 chroot "$MOUNT_DIR" /bin/bash "/tmp/run.sh"
 rm -f "${MOUNT_DIR}/tmp/run.sh"
 
-# --- Activation services ---
-log_info "Activation des services..."
+log_info "Activation services..."
 for service in expand-rootfs.service runtipios-first-boot.service avahi-daemon.service; do ln -sf "/etc/systemd/system/${service}" "${MOUNT_DIR}/etc/systemd/system/multi-user.target.wants/${service}"; done
 if echo "${CONFIG_packages_install}" | grep -q "unattended-upgrades"; then chroot "$MOUNT_DIR" dpkg-reconfigure -plow unattended-upgrades; fi
 
-# --- Finalisation ---
-log_info "Nettoyage..."
+log_info "Nettoyage du chroot..."
 chroot "$MOUNT_DIR" apt-get clean
 cleanup; trap - EXIT
 
@@ -187,14 +178,47 @@ log_info "Copie de l'image finale..."
 FINAL_IMAGE="${OUTPUT_DIR}/${OUTPUT_NAME:-RuntipiOS-$(date +%Y%m%d)}.img"
 mv "$BASE_IMAGE" "$FINAL_IMAGE"
 
-# --- Compression ---
-if [ "${CONFIG_build_compress:-false}" = "true" ]; then
-    log_info "Compression..."
+# --- Compression Robuste ---
+log_info "Vérification de la compression..."
+CONFIG_build_compress=$(echo "${CONFIG_build_compress}" | tr -d '[:space:]')
+log_info "Compression: '${CONFIG_build_compress}' / Format: '${CONFIG_build_compression_format}'"
+
+if [ "${CONFIG_build_compress}" = "true" ]; then
+    log_info "Compression en cours..."
     case "${CONFIG_build_compression_format}" in
-        xz) xz -T0 "$FINAL_IMAGE" ;;
-        gz) gzip "$FINAL_IMAGE" ;;
-        zip) zip -j "${FINAL_IMAGE}.zip" "$FINAL_IMAGE" && rm "$FINAL_IMAGE" ;;
+        xz) xz -9 -T0 "$FINAL_IMAGE" ;;
+        gz) gzip -9 "$FINAL_IMAGE" ;;
+        zip) zip -9 -j "${FINAL_IMAGE}.zip" "$FINAL_IMAGE" && rm "$FINAL_IMAGE" ;;
     esac
+    log_success "Compression terminée !"
+else
+    log_warning "Compression désactivée"
 fi
 
+# --- Nettoyage des fichiers temporaires ---
+log_info "Suppression des fichiers temporaires..."
+rm -rf "${WORK_DIR}"
+log_success "Fichiers temporaires supprimés"
+
+# --- Vérification taille finale ---
+if [ "${CONFIG_build_compress}" = "true" ]; then
+    COMPRESSED_FILE=$(ls ${OUTPUT_DIR}/*.img.* 2>/dev/null | head -1)
+    if [ -f "$COMPRESSED_FILE" ]; then
+        FINAL_SIZE=$(du -h "$COMPRESSED_FILE" | cut -f1)
+        FINAL_SIZE_BYTES=$(stat -L -c%s "$COMPRESSED_FILE")
+        MAX_SIZE=$((2 * 1024 * 1024 * 1024))
+        
+        log_info "Taille du fichier final: $FINAL_SIZE"
+        
+        if [ $FINAL_SIZE_BYTES -gt $MAX_SIZE ]; then
+            log_error "⚠️  ATTENTION: Le fichier dépasse 2GB (limite GitHub Release)"
+            log_error "Taille: $FINAL_SIZE - Vous devrez utiliser un autre service de distribution"
+        else
+            log_success "✓ Taille OK pour GitHub Release ($FINAL_SIZE < 2GB)"
+        fi
+    fi
+fi
+
+log_success "════════════════════════════════════════════"
 log_success "Build terminé avec succès !"
+log_success "════════════════════════════════════════════"

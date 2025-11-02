@@ -104,6 +104,14 @@ mkdir -p "${MOUNT_DIR}/boot/firmware"
 mount "$BOOT_PART" "${MOUNT_DIR}/boot/firmware"
 log_success "Partitions montées."
 
+# --- Configuration des identifiants via userconf (comme Raspberry Pi Imager) ---
+log_info "Configuration des identifiants dans la partition boot..."
+# Générer le hash du mot de passe avec openssl
+PASSWORD_HASH=$(openssl passwd -6 "${CONFIG_system_default_password}")
+# Créer le fichier userconf dans la partition boot
+echo "${CONFIG_system_default_user}:${PASSWORD_HASH}" > "${MOUNT_DIR}/boot/firmware/userconf.txt"
+log_success "Fichier userconf.txt créé avec les identifiants"
+
 # --- Chroot avec /dev/pts ---
 log_info "Préparation du chroot..."
 cp /etc/resolv.conf "${MOUNT_DIR}/etc/"
@@ -236,39 +244,11 @@ ExecStart=-/sbin/agetty --autologin ${CONFIG_system_default_user} --noclear %I \
 AUTOLOGIN
 echo "[CHROOT] ✓ Autologin configuré"
 
-# Configuration du profil utilisateur pour exécuter le script au premier login
-echo "[CHROOT] Configuration du profil utilisateur..."
-cat > /home/${CONFIG_system_default_user}/.profile_runtipios <<PROFILE
-#!/bin/bash
-# Script exécuté au premier login automatique
-if [ -f /etc/runtipi/configured ]; then
-    # Système déjà configuré, afficher le MOTD normal
-    cat /etc/motd
-else
-    # Premier démarrage, exécuter le script de configuration
-    echo "[RuntipiOS] Premier démarrage détecté..."
-    sudo /usr/local/bin/runtipios-first-boot.sh
-fi
-PROFILE
-
-# Ajouter l'appel dans .bashrc
-cat >> /home/${CONFIG_system_default_user}/.bashrc <<BASHRC
-
-# RuntipiOS First Boot
-if [ -f ~/.profile_runtipios ] && [ ! -f /etc/runtipi/first-login-done ]; then
-    bash ~/.profile_runtipios
-    touch /etc/runtipi/first-login-done
-fi
-BASHRC
-
-chown ${CONFIG_system_default_user}:${CONFIG_system_default_user} /home/${CONFIG_system_default_user}/.profile_runtipios
-chown ${CONFIG_system_default_user}:${CONFIG_system_default_user} /home/${CONFIG_system_default_user}/.bashrc
-chmod +x /home/${CONFIG_system_default_user}/.profile_runtipios
-
-echo "[CHROOT] Vérification des fichiers créés..."
-ls -la /home/${CONFIG_system_default_user}/.profile_runtipios || echo "[CHROOT] ✗ ERREUR: .profile_runtipios non créé!"
-ls -la /home/${CONFIG_system_default_user}/.bashrc || echo "[CHROOT] ✗ ERREUR: .bashrc non trouvé!"
-echo "[CHROOT] ✓ Profil utilisateur configuré"
+# DÉSACTIVER complètement getty@tty1 au démarrage
+echo "[CHROOT] Désactivation du service getty@tty1..."
+systemctl disable getty@tty1.service || true
+systemctl mask getty@tty1.service || true
+echo "[CHROOT] ✓ Service getty@tty1 désactivé et masqué"
 
 # Sudo sans mot de passe
 echo "${CONFIG_system_default_user} ALL=(ALL) NOPASSWD: ALL" > "/etc/sudoers.d/010_${CONFIG_system_default_user}-nopasswd"
@@ -504,6 +484,49 @@ Restart=no
 WantedBy=multi-user.target
 E2
 
+# Service custom pour remplacer getty@tty1 et prendre le contrôle du terminal
+cat > /etc/systemd/system/runtipios-console.service <<'CONSOLE'
+[Unit]
+Description=RuntipiOS Console Manager
+After=systemd-user-sessions.service plymouth-quit-wait.service
+Before=getty.target
+Conflicts=getty@tty1.service
+[Service]
+Type=idle
+ExecStart=/bin/bash /usr/local/bin/runtipios-console.sh
+Restart=always
+RestartSec=0
+StandardInput=tty
+StandardOutput=tty
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+[Install]
+WantedBy=multi-user.target
+CONSOLE
+
+# Script qui gère le terminal principal
+cat > /usr/local/bin/runtipios-console.sh <<'CONSOLESH'
+#!/bin/bash
+# Ce script prend le contrôle complet de tty1
+
+clear
+
+# Si le système n'est pas encore configuré, lancer le script de configuration
+if [ ! -f /etc/runtipi/configured ]; then
+    echo "╔════════════════════════════════════════════════════════════════╗"
+    echo "║                     RuntipiOS - Premier Démarrage              ║"
+    echo "╚════════════════════════════════════════════════════════════════╝"
+    echo ""
+    # Lancer le script de premier démarrage
+    /usr/local/bin/runtipios-first-boot.sh
+else
+    # Système configuré, ouvrir une session normale pour l'utilisateur
+    exec /bin/login -f ${CONFIG_system_default_user}
+fi
+CONSOLESH
+chmod +x /usr/local/bin/runtipios-console.sh
+
 cat > /etc/systemd/system/runtipi-installer.service <<'E3'
 [Unit]
 Description=Runtipi Automatic Installer
@@ -549,7 +572,7 @@ chroot "$MOUNT_DIR" /bin/bash "/tmp/run.sh" || {
 rm -f "${MOUNT_DIR}/tmp/run.sh"
 
 log_info "Activation des services..."
-for service in expand-rootfs.service runtipios-first-boot.service avahi-daemon.service; do
+for service in expand-rootfs.service runtipios-first-boot.service runtipios-console.service avahi-daemon.service; do
     ln -sf "/etc/systemd/system/${service}" "${MOUNT_DIR}/etc/systemd/system/multi-user.target.wants/${service}"
 done
 

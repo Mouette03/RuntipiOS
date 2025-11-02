@@ -104,6 +104,18 @@ mkdir -p "${MOUNT_DIR}/boot/firmware"
 mount "$BOOT_PART" "${MOUNT_DIR}/boot/firmware"
 log_success "Partitions montées."
 
+# --- Configuration des identifiants via userconf (méthode officielle Raspberry Pi) ---
+log_info "Configuration des identifiants dans la partition boot..."
+# On utilise chroot pour générer le hash avec la même version d'openssl que le système cible
+mount -t proc proc "${MOUNT_DIR}/proc"
+mount -t sysfs sys "${MOUNT_DIR}/sys"
+PASSWORD_HASH=$(chroot "${MOUNT_DIR}" openssl passwd -6 "${CONFIG_system_default_password}")
+umount "${MOUNT_DIR}/proc"
+umount "${MOUNT_DIR}/sys"
+# Créer le fichier userconf dans la partition boot
+echo "${CONFIG_system_default_user}:${PASSWORD_HASH}" > "${MOUNT_DIR}/boot/firmware/userconf.txt"
+log_success "Fichier userconf.txt créé avec les identifiants"
+
 # --- Chroot avec /dev/pts ---
 log_info "Préparation du chroot..."
 cp /etc/resolv.conf "${MOUNT_DIR}/etc/"
@@ -181,9 +193,7 @@ sed -i "s/XKBLAYOUT=.*/XKBLAYOUT=\"${CONFIG_system_keyboard_layout}\"/" /etc/def
 echo "[CHROOT] ✓ Clavier configuré"
 
 echo "[CHROOT] Configuration du pays WiFi..."
-raspi-config nonint do_wifi_country "${CONFIG_system_wifi_country}" || echo "[CHROOT] ⚠ Impossible de configurer le pays WiFi via raspi-config, utilisation alternative..."
-# Alternative si raspi-config échoue
-echo "country=${CONFIG_system_wifi_country}" > /etc/wpa_supplicant/wpa_supplicant.conf
+raspi-config nonint do_wifi_country "${CONFIG_system_wifi_country}" || echo "[CHROOT] ⚠ Impossible de configurer le pays WiFi via raspi-config"
 echo "[CHROOT] ✓ Pays WiFi configuré"
 
 echo "[CHROOT] ✓ Configuration système terminée"
@@ -214,53 +224,67 @@ systemctl enable NetworkManager.service
 echo "[CHROOT] ✓ NetworkManager configuré"
 
 echo "============================================"
-echo "[CHROOT] Création de l'utilisateur..."
+echo "[CHROOT] Configuration de l'utilisateur..."
 echo "============================================"
 
-# Créer l'utilisateur
-if id "pi" &>/dev/null; then
-    echo "[CHROOT] Renommage de l'utilisateur 'pi' en '${CONFIG_system_default_user}'..."
-    usermod -l "${CONFIG_system_default_user}" pi
-    usermod -d "/home/${CONFIG_system_default_user}" -m "${CONFIG_system_default_user}"
-    groupmod -n "${CONFIG_system_default_user}" pi
-else
-    echo "[CHROOT] Création de l'utilisateur '${CONFIG_system_default_user}'..."
-    useradd -m -s /bin/bash -G sudo,netdev "${CONFIG_system_default_user}"
-fi
+# Note: L'utilisateur sera créé automatiquement au premier boot via userconf.txt
+# On configure juste le répertoire home et le .bashrc pour l'utilisateur à venir
 
-# Configuration du mot de passe
-echo "[CHROOT] Configuration du mot de passe..."
-echo "${CONFIG_system_default_user}:${CONFIG_system_default_password}" | chpasswd
+# Créer le répertoire home de l'utilisateur
+echo "[CHROOT] Préparation du répertoire home pour '${CONFIG_system_default_user}'..."
+mkdir -p /home/${CONFIG_system_default_user}
 
-# Vérification
-if id "${CONFIG_system_default_user}" &>/dev/null; then
-    echo "[CHROOT] ✓ Utilisateur créé avec succès"
-    echo "[CHROOT] UID: $(id -u ${CONFIG_system_default_user})"
-    echo "[CHROOT] Groupes: $(groups ${CONFIG_system_default_user})"
-else
-    echo "[CHROOT] ✗ ERREUR: Utilisateur non créé!"
-    exit 1
-fi
-
-# Configuration de l'autologin (TOUJOURS activé pour le premier démarrage)
-echo "[CHROOT] Configuration de l'autologin automatique..."
-mkdir -p /etc/systemd/system/getty@tty1.service.d
-cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf <<AUTOLOGIN
+# Configuration de l'autologin
+if [ "${CONFIG_system_autologin}" = "true" ]; then
+    echo "[CHROOT] Configuration de l'autologin automatique..."
+    mkdir -p /etc/systemd/system/getty@tty1.service.d
+    cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf <<AUTOLOGIN
 [Service]
 ExecStart=
 ExecStart=-/sbin/agetty --autologin ${CONFIG_system_default_user} --noclear %I \$TERM
 AUTOLOGIN
-echo "[CHROOT] ✓ Autologin configuré"
+    echo "[CHROOT] ✓ Autologin configuré pour getty@tty1"
+    
+    # S'assurer que getty@tty1 est activé
+    systemctl enable getty@tty1.service || true
+    echo "[CHROOT] ✓ Service getty@tty1 activé avec autologin"
+else
+    echo "[CHROOT] Autologin désactivé (selon config.yml)"
+fi
 
-# DÉSACTIVER complètement getty@tty1 au démarrage
-echo "[CHROOT] Désactivation du service getty@tty1..."
-systemctl disable getty@tty1.service || true
-systemctl mask getty@tty1.service || true
-echo "[CHROOT] ✓ Service getty@tty1 désactivé et masqué"
+# Configuration du .bashrc pour lancer le script au premier login (seulement si autologin)
+if [ "${CONFIG_system_autologin}" = "true" ]; then
+    echo "[CHROOT] Configuration du .bashrc pour premier démarrage automatique..."
+    cat > /home/${CONFIG_system_default_user}/.bashrc <<'BASHRC'
+# RuntipiOS - Configuration par défaut
 
-# Sudo sans mot de passe
+# RuntipiOS - Premier démarrage automatique
+if [ -f /usr/local/bin/runtipios-first-boot.sh ] && [ ! -f /etc/runtipi/configured ]; then
+    clear
+    echo "╔════════════════════════════════════════════════════════════════╗"
+    echo "║                     RuntipiOS - Premier Démarrage              ║"
+    echo "╚════════════════════════════════════════════════════════════════╝"
+    echo ""
+    sudo /usr/local/bin/runtipios-first-boot.sh
+fi
+BASHRC
+    echo "[CHROOT] ✓ Configuration du .bashrc créée (autologin activé)"
+else
+    echo "[CHROOT] Autologin désactivé - utilisation du service systemd pour first-boot"
+    # Créer un .bashrc minimal
+    cat > /home/${CONFIG_system_default_user}/.bashrc <<'BASHRC'
+# RuntipiOS - Configuration par défaut
+# Le script de premier démarrage s'exécute via le service systemd runtipios-first-boot.service
+BASHRC
+    echo "[CHROOT] ✓ Configuration du .bashrc créée (service systemd)"
+fi
+
+echo "[CHROOT] ✓ Configuration du premier login terminée"
+
+# Sudo sans mot de passe pour l'utilisateur à venir
 echo "${CONFIG_system_default_user} ALL=(ALL) NOPASSWD: ALL" > "/etc/sudoers.d/010_${CONFIG_system_default_user}-nopasswd"
 chmod 440 "/etc/sudoers.d/010_${CONFIG_system_default_user}-nopasswd"
+echo "[CHROOT] ✓ Configuration sudo créée"
 
 # SSH
 sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
@@ -313,6 +337,12 @@ echo "============================================"
 echo "[CHROOT] Création des scripts de démarrage..."
 echo "============================================"
 
+# Créer un fichier de configuration pour le runtime
+cat > /etc/runtipi/runtime.conf << RUNTIMECONF
+WIFI_CONNECT_SSID="${CONFIG_wifi_connect_ssid}"
+SYSTEM_HOSTNAME="${CONFIG_system_hostname}"
+RUNTIMECONF
+
 cat > /usr/local/bin/runtipios-first-boot.sh << 'BOOTEOF'
 #!/bin/bash
 set -e
@@ -320,6 +350,15 @@ set -e
 echo "[RuntipiOS] ============================================"
 echo "[RuntipiOS] Script de premier démarrage démarré"
 echo "[RuntipiOS] ============================================"
+
+# Charger la configuration runtime
+if [ -f /etc/runtipi/runtime.conf ]; then
+    source /etc/runtipi/runtime.conf
+else
+    echo "[RuntipiOS] ✗ ERREUR: Configuration runtime introuvable!"
+    WIFI_CONNECT_SSID="RuntipiOS-Setup"
+    SYSTEM_HOSTNAME="runtipios"
+fi
 
 # Fichier marqueur de configuration
 CONFIGURED="/etc/runtipi/configured"
@@ -392,17 +431,16 @@ if [ "$HAS_NETWORK" = true ]; then
     echo "[RuntipiOS] RÉSEAU DÉTECTÉ - Démarrage de l'installation de Runtipi"
     touch "$CONFIGURED"
     systemctl start runtipi-installer.service
-    systemctl disable --now runtipios-first-boot.service
     echo "[RuntipiOS] ✓ Installation de Runtipi lancée"
     echo "[RuntipiOS] ============================================"
     echo "[RuntipiOS] L'installation de Runtipi est en cours..."
     echo "[RuntipiOS] Veuillez patienter quelques minutes."
-    echo "[RuntipiOS] Une fois terminé, accédez à http://runtipios.local"
+    echo "[RuntipiOS] Une fois terminé, accédez à http://${SYSTEM_HOSTNAME}.local"
     echo "[RuntipiOS] ============================================"
     exit 0
 else
     echo "[RuntipiOS] AUCUN RÉSEAU - Lancement du portail WiFi"
-    echo "[RuntipiOS] SSID: ${CONFIG_wifi_connect_ssid}"
+    echo "[RuntipiOS] SSID: ${WIFI_CONNECT_SSID}"
     echo "[RuntipiOS] ============================================"
     
     # Vérifier que l'interface WiFi existe
@@ -426,16 +464,23 @@ else
     sleep 2
     
     echo "[RuntipiOS] Démarrage du portail captif WiFi-Connect..."
-    echo "[RuntipiOS] Connectez-vous au réseau WiFi: ${CONFIG_wifi_connect_ssid}"
+    echo "[RuntipiOS] Connectez-vous au réseau WiFi: ${WIFI_CONNECT_SSID}"
     echo "[RuntipiOS] ============================================"
     
     # Lancer WiFi-Connect qui gérera lui-même le WiFi
-    /usr/local/bin/wifi-connect --portal-ssid "${CONFIG_wifi_connect_ssid}" --ui-directory "/etc/runtipi/ui"
+    /usr/local/bin/wifi-connect --portal-ssid "${WIFI_CONNECT_SSID}" --ui-directory "/etc/runtipi/ui"
     
-    # Si WiFi-Connect se termine avec succès, redémarrer pour appliquer la config
-    echo "[RuntipiOS] ✓ WiFi configuré, redémarrage..."
-    sleep 3
-    reboot
+    # Si WiFi-Connect se termine avec succès, marquer comme configuré et lancer l'installation
+    echo "[RuntipiOS] ✓ WiFi configuré avec succès!"
+    touch "$CONFIGURED"
+    echo "[RuntipiOS] Démarrage de l'installation de Runtipi..."
+    systemctl start runtipi-installer.service
+    echo "[RuntipiOS] ============================================"
+    echo "[RuntipiOS] L'installation de Runtipi est en cours..."
+    echo "[RuntipiOS] Veuillez patienter quelques minutes."
+    echo "[RuntipiOS] Une fois terminé, accédez à http://${SYSTEM_HOSTNAME}.local"
+    echo "[RuntipiOS] ============================================"
+    exit 0
 fi
 BOOTEOF
 chmod +x /usr/local/bin/runtipios-first-boot.sh
@@ -514,8 +559,9 @@ chmod +x /usr/local/bin/expand-rootfs.sh
 cat > /etc/systemd/system/runtipios-first-boot.service <<'E2'
 [Unit]
 Description=RuntipiOS First Boot Logic
-After=network-online.target NetworkManager.service systemd-networkd.service
+After=network-online.target NetworkManager.service
 Wants=network-online.target
+ConditionPathExists=!/etc/runtipi/configured
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/runtipios-first-boot.sh
@@ -527,58 +573,6 @@ Restart=no
 [Install]
 WantedBy=multi-user.target
 E2
-
-# Service custom pour remplacer getty@tty1 et prendre le contrôle du terminal
-cat > /etc/systemd/system/runtipios-console.service <<'CONSOLE'
-[Unit]
-Description=RuntipiOS Console Manager
-After=systemd-user-sessions.service plymouth-quit-wait.service
-Before=getty.target
-Conflicts=getty@tty1.service
-ConditionPathExists=!/etc/runtipi/configured
-[Service]
-Type=oneshot
-ExecStart=/bin/bash /usr/local/bin/runtipios-console.sh
-RemainAfterExit=yes
-StandardInput=tty
-StandardOutput=tty
-TTYPath=/dev/tty1
-TTYReset=yes
-TTYVHangup=yes
-[Install]
-WantedBy=multi-user.target
-CONSOLE
-
-# Script qui gère le terminal principal
-cat > /usr/local/bin/runtipios-console.sh <<'CONSOLESH'
-#!/bin/bash
-# Ce script prend le contrôle complet de tty1
-
-clear
-
-# Si le système n'est pas encore configuré, lancer le script de configuration
-if [ ! -f /etc/runtipi/configured ]; then
-    echo "╔════════════════════════════════════════════════════════════════╗"
-    echo "║                     RuntipiOS - Premier Démarrage              ║"
-    echo "╚════════════════════════════════════════════════════════════════╝"
-    echo ""
-    # Lancer le script de premier démarrage
-    /usr/local/bin/runtipios-first-boot.sh
-    
-    # Une fois configuré, désactiver ce service
-    systemctl disable runtipios-console.service
-    
-    # Redémarrer pour revenir à l'autologin normal
-    echo ""
-    echo "╔════════════════════════════════════════════════════════════════╗"
-    echo "║              Configuration terminée avec succès !              ║"
-    echo "║                  Redémarrage dans 10 secondes...               ║"
-    echo "╚════════════════════════════════════════════════════════════════╝"
-    sleep 10
-    reboot
-fi
-CONSOLESH
-chmod +x /usr/local/bin/runtipios-console.sh
 
 cat > /etc/systemd/system/runtipi-installer.service <<'E3'
 [Unit]
@@ -625,9 +619,18 @@ chroot "$MOUNT_DIR" /bin/bash "/tmp/run.sh" || {
 rm -f "${MOUNT_DIR}/tmp/run.sh"
 
 log_info "Activation des services..."
-for service in expand-rootfs.service runtipios-first-boot.service runtipios-console.service avahi-daemon.service; do
+# Activer expand-rootfs et avahi-daemon
+for service in expand-rootfs.service avahi-daemon.service; do
     ln -sf "/etc/systemd/system/${service}" "${MOUNT_DIR}/etc/systemd/system/multi-user.target.wants/${service}"
 done
+
+# Activer runtipios-first-boot.service seulement si autologin est désactivé
+if [ "${CONFIG_system_autologin}" != "true" ]; then
+    ln -sf "/etc/systemd/system/runtipios-first-boot.service" "${MOUNT_DIR}/etc/systemd/system/multi-user.target.wants/runtipios-first-boot.service"
+    log_info "Service runtipios-first-boot.service activé (autologin désactivé)"
+else
+    log_info "Service runtipios-first-boot.service non activé (géré par .bashrc avec autologin)"
+fi
 
 if echo "${CONFIG_packages_install}" | grep -q "unattended-upgrades"; then
     chroot "$MOUNT_DIR" dpkg-reconfigure -plow unattended-upgrades

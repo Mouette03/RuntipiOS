@@ -23,7 +23,7 @@ system:
   default_user: "runtipi"
   default_password: "runtipi"
   # Activer l'autologin en console pour le débogage (true/false)
-  autologin: false
+  autologin: true
 
 # -- Configuration de Runtipi --
 runtipi:

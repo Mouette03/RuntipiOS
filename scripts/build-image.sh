@@ -226,16 +226,49 @@ else
     exit 1
 fi
 
-# Autologin si activé
-if [ "${CONFIG_system_autologin}" = "true" ]; then
-    mkdir -p /etc/systemd/system/getty@tty1.service.d
-    cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf <<AUTOLOGIN
+# Configuration de l'autologin (TOUJOURS activé pour le premier démarrage)
+echo "[CHROOT] Configuration de l'autologin automatique..."
+mkdir -p /etc/systemd/system/getty@tty1.service.d
+cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf <<AUTOLOGIN
 [Service]
 ExecStart=
 ExecStart=-/sbin/agetty --autologin ${CONFIG_system_default_user} --noclear %I \$TERM
 AUTOLOGIN
-    echo "[CHROOT] ✓ Autologin configuré"
+echo "[CHROOT] ✓ Autologin configuré"
+
+# Configuration du profil utilisateur pour exécuter le script au premier login
+echo "[CHROOT] Configuration du profil utilisateur..."
+cat > /home/${CONFIG_system_default_user}/.profile_runtipios <<PROFILE
+#!/bin/bash
+# Script exécuté au premier login automatique
+if [ -f /etc/runtipi/configured ]; then
+    # Système déjà configuré, afficher le MOTD normal
+    cat /etc/motd
+else
+    # Premier démarrage, exécuter le script de configuration
+    echo "[RuntipiOS] Premier démarrage détecté..."
+    sudo /usr/local/bin/runtipios-first-boot.sh
 fi
+PROFILE
+
+# Ajouter l'appel dans .bashrc
+cat >> /home/${CONFIG_system_default_user}/.bashrc <<BASHRC
+
+# RuntipiOS First Boot
+if [ -f ~/.profile_runtipios ] && [ ! -f /etc/runtipi/first-login-done ]; then
+    bash ~/.profile_runtipios
+    touch /etc/runtipi/first-login-done
+fi
+BASHRC
+
+chown ${CONFIG_system_default_user}:${CONFIG_system_default_user} /home/${CONFIG_system_default_user}/.profile_runtipios
+chown ${CONFIG_system_default_user}:${CONFIG_system_default_user} /home/${CONFIG_system_default_user}/.bashrc
+chmod +x /home/${CONFIG_system_default_user}/.profile_runtipios
+
+echo "[CHROOT] Vérification des fichiers créés..."
+ls -la /home/${CONFIG_system_default_user}/.profile_runtipios || echo "[CHROOT] ✗ ERREUR: .profile_runtipios non créé!"
+ls -la /home/${CONFIG_system_default_user}/.bashrc || echo "[CHROOT] ✗ ERREUR: .bashrc non trouvé!"
+echo "[CHROOT] ✓ Profil utilisateur configuré"
 
 # Sudo sans mot de passe
 echo "${CONFIG_system_default_user} ALL=(ALL) NOPASSWD: ALL" > "/etc/sudoers.d/010_${CONFIG_system_default_user}-nopasswd"
@@ -383,6 +416,10 @@ fi
 BOOTEOF
 chmod +x /usr/local/bin/runtipios-first-boot.sh
 
+echo "[CHROOT] Vérification du script de premier démarrage..."
+ls -la /usr/local/bin/runtipios-first-boot.sh || echo "[CHROOT] ✗ ERREUR: runtipios-first-boot.sh non créé!"
+echo "[CHROOT] ✓ Script de premier démarrage créé et exécutable"
+
 cat > /etc/systemd/system/expand-rootfs.service <<'E1'
 [Unit]
 Description=Expand Root Filesystem on First Boot
@@ -455,8 +492,6 @@ cat > /etc/systemd/system/runtipios-first-boot.service <<'E2'
 Description=RuntipiOS First Boot Logic
 After=network-online.target NetworkManager.service systemd-networkd.service
 Wants=network-online.target
-Before=getty@tty1.service
-Conflicts=getty@tty1.service
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/runtipios-first-boot.sh
@@ -468,21 +503,6 @@ Restart=no
 [Install]
 WantedBy=multi-user.target
 E2
-
-# Service pour forcer l'arrêt du login si nécessaire
-cat > /etc/systemd/system/runtipios-block-login.service <<'BLOCK'
-[Unit]
-Description=Block Login Screen During First Boot
-After=runtipios-first-boot.service
-Before=getty@tty1.service
-Conflicts=getty@tty1.service
-[Service]
-Type=oneshot
-ExecStart=/bin/true
-RemainAfterExit=yes
-[Install]
-WantedBy=multi-user.target
-BLOCK
 
 cat > /etc/systemd/system/runtipi-installer.service <<'E3'
 [Unit]
@@ -529,7 +549,7 @@ chroot "$MOUNT_DIR" /bin/bash "/tmp/run.sh" || {
 rm -f "${MOUNT_DIR}/tmp/run.sh"
 
 log_info "Activation des services..."
-for service in expand-rootfs.service runtipios-first-boot.service runtipios-block-login.service avahi-daemon.service; do
+for service in expand-rootfs.service runtipios-first-boot.service avahi-daemon.service; do
     ln -sf "/etc/systemd/system/${service}" "${MOUNT_DIR}/etc/systemd/system/multi-user.target.wants/${service}"
 done
 

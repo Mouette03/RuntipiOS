@@ -104,14 +104,6 @@ mkdir -p "${MOUNT_DIR}/boot/firmware"
 mount "$BOOT_PART" "${MOUNT_DIR}/boot/firmware"
 log_success "Partitions montées."
 
-# --- Configuration des identifiants via userconf (comme Raspberry Pi Imager) ---
-log_info "Configuration des identifiants dans la partition boot..."
-# Générer le hash du mot de passe avec openssl
-PASSWORD_HASH=$(openssl passwd -6 "${CONFIG_system_default_password}")
-# Créer le fichier userconf dans la partition boot
-echo "${CONFIG_system_default_user}:${PASSWORD_HASH}" > "${MOUNT_DIR}/boot/firmware/userconf.txt"
-log_success "Fichier userconf.txt créé avec les identifiants"
-
 # --- Chroot avec /dev/pts ---
 log_info "Préparation du chroot..."
 cp /etc/resolv.conf "${MOUNT_DIR}/etc/"
@@ -204,6 +196,22 @@ apt-get update && apt-get -y upgrade
 echo "[CHROOT] Installation des paquets système..."
 apt-get install -y --no-install-recommends network-manager avahi-daemon openssh-server rfkill iw ${CONFIG_packages_install}
 apt-get remove -y --purge ${CONFIG_packages_remove}
+
+echo "[CHROOT] Configuration de NetworkManager pour WiFi..."
+# Configurer NetworkManager pour gérer le WiFi
+cat > /etc/NetworkManager/conf.d/10-globally-managed-devices.conf <<NMCONF
+[keyfile]
+unmanaged-devices=none
+NMCONF
+
+# Désactiver wpa_supplicant qui interfère avec NetworkManager
+systemctl disable wpa_supplicant.service || true
+systemctl mask wpa_supplicant.service || true
+
+# S'assurer que NetworkManager démarre au boot
+systemctl enable NetworkManager.service
+
+echo "[CHROOT] ✓ NetworkManager configuré"
 
 echo "============================================"
 echo "[CHROOT] Création de l'utilisateur..."
@@ -401,24 +409,33 @@ else
     if ! ip link show wlan0 >/dev/null 2>&1; then
         echo "[RuntipiOS] ✗ ERREUR: Interface WiFi (wlan0) non détectée!"
         echo "[RuntipiOS] Veuillez connecter un câble Ethernet ou vérifier votre matériel WiFi."
-        echo "[RuntipiOS] ============================================"
-        sleep 30
+        echo "[RuntipiOS] Appuyez sur Ctrl+C pour sortir ou attendez 60 secondes..."
+        sleep 60
         exit 1
     fi
     
-    # S'assurer que l'interface WiFi est UP
-    echo "[RuntipiOS] Activation de l'interface WiFi..."
-    ip link set wlan0 up 2>/dev/null || true
+    # S'assurer que l'interface WiFi est UP et débloquée
+    echo "[RuntipiOS] Préparation de l'interface WiFi..."
     rfkill unblock wifi 2>/dev/null || true
-    sleep 3
+    ip link set wlan0 up 2>/dev/null || true
+    sleep 2
     
-    # Arrêter NetworkManager temporairement pour éviter les conflits
-    echo "[RuntipiOS] Arrêt temporaire de NetworkManager..."
-    systemctl stop NetworkManager 2>/dev/null || true
+    # Configurer NetworkManager pour libérer wlan0 temporairement
+    echo "[RuntipiOS] Configuration de NetworkManager..."
+    nmcli device set wlan0 managed no 2>/dev/null || true
     sleep 2
     
     echo "[RuntipiOS] Démarrage du portail captif WiFi-Connect..."
-    exec /usr/local/bin/wifi-connect --portal-ssid "${CONFIG_wifi_connect_ssid}" --ui-directory "/etc/runtipi/ui"
+    echo "[RuntipiOS] Connectez-vous au réseau WiFi: ${CONFIG_wifi_connect_ssid}"
+    echo "[RuntipiOS] ============================================"
+    
+    # Lancer WiFi-Connect qui gérera lui-même le WiFi
+    /usr/local/bin/wifi-connect --portal-ssid "${CONFIG_wifi_connect_ssid}" --ui-directory "/etc/runtipi/ui"
+    
+    # Si WiFi-Connect se termine avec succès, redémarrer pour appliquer la config
+    echo "[RuntipiOS] ✓ WiFi configuré, redémarrage..."
+    sleep 3
+    reboot
 fi
 BOOTEOF
 chmod +x /usr/local/bin/runtipios-first-boot.sh

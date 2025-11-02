@@ -386,11 +386,38 @@ if [ "$HAS_NETWORK" = true ]; then
     systemctl start runtipi-installer.service
     systemctl disable --now runtipios-first-boot.service
     echo "[RuntipiOS] ✓ Installation de Runtipi lancée"
+    echo "[RuntipiOS] ============================================"
+    echo "[RuntipiOS] L'installation de Runtipi est en cours..."
+    echo "[RuntipiOS] Veuillez patienter quelques minutes."
+    echo "[RuntipiOS] Une fois terminé, accédez à http://runtipios.local"
+    echo "[RuntipiOS] ============================================"
     exit 0
 else
     echo "[RuntipiOS] AUCUN RÉSEAU - Lancement du portail WiFi"
     echo "[RuntipiOS] SSID: ${CONFIG_wifi_connect_ssid}"
     echo "[RuntipiOS] ============================================"
+    
+    # Vérifier que l'interface WiFi existe
+    if ! ip link show wlan0 >/dev/null 2>&1; then
+        echo "[RuntipiOS] ✗ ERREUR: Interface WiFi (wlan0) non détectée!"
+        echo "[RuntipiOS] Veuillez connecter un câble Ethernet ou vérifier votre matériel WiFi."
+        echo "[RuntipiOS] ============================================"
+        sleep 30
+        exit 1
+    fi
+    
+    # S'assurer que l'interface WiFi est UP
+    echo "[RuntipiOS] Activation de l'interface WiFi..."
+    ip link set wlan0 up 2>/dev/null || true
+    rfkill unblock wifi 2>/dev/null || true
+    sleep 3
+    
+    # Arrêter NetworkManager temporairement pour éviter les conflits
+    echo "[RuntipiOS] Arrêt temporaire de NetworkManager..."
+    systemctl stop NetworkManager 2>/dev/null || true
+    sleep 2
+    
+    echo "[RuntipiOS] Démarrage du portail captif WiFi-Connect..."
     exec /usr/local/bin/wifi-connect --portal-ssid "${CONFIG_wifi_connect_ssid}" --ui-directory "/etc/runtipi/ui"
 fi
 BOOTEOF
@@ -491,11 +518,11 @@ Description=RuntipiOS Console Manager
 After=systemd-user-sessions.service plymouth-quit-wait.service
 Before=getty.target
 Conflicts=getty@tty1.service
+ConditionPathExists=!/etc/runtipi/configured
 [Service]
-Type=idle
+Type=oneshot
 ExecStart=/bin/bash /usr/local/bin/runtipios-console.sh
-Restart=always
-RestartSec=0
+RemainAfterExit=yes
 StandardInput=tty
 StandardOutput=tty
 TTYPath=/dev/tty1
@@ -520,9 +547,18 @@ if [ ! -f /etc/runtipi/configured ]; then
     echo ""
     # Lancer le script de premier démarrage
     /usr/local/bin/runtipios-first-boot.sh
-else
-    # Système configuré, ouvrir une session normale pour l'utilisateur
-    exec /bin/login -f ${CONFIG_system_default_user}
+    
+    # Une fois configuré, désactiver ce service
+    systemctl disable runtipios-console.service
+    
+    # Redémarrer pour revenir à l'autologin normal
+    echo ""
+    echo "╔════════════════════════════════════════════════════════════════╗"
+    echo "║              Configuration terminée avec succès !              ║"
+    echo "║                  Redémarrage dans 10 secondes...               ║"
+    echo "╚════════════════════════════════════════════════════════════════╝"
+    sleep 10
+    reboot
 fi
 CONSOLESH
 chmod +x /usr/local/bin/runtipios-console.sh

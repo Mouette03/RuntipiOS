@@ -296,59 +296,90 @@ cat > /usr/local/bin/runtipios-first-boot.sh << 'BOOTEOF'
 #!/bin/bash
 set -e
 
+echo "[RuntipiOS] ============================================"
+echo "[RuntipiOS] Script de premier démarrage démarré"
+echo "[RuntipiOS] ============================================"
+
 # Fichier marqueur de configuration
 CONFIGURED="/etc/runtipi/configured"
 
 # Si déjà configuré, ne rien faire
 if [ -f "$CONFIGURED" ]; then
+    echo "[RuntipiOS] Système déjà configuré, sortie"
     exit 0
 fi
 
-# Attendre que NetworkManager soit prêt
 echo "[RuntipiOS] Attente de NetworkManager..."
 for i in {1..30}; do
-    if systemctl is-active --quiet NetworkManager; then
+    if systemctl is-active --quiet NetworkManager 2>/dev/null; then
+        echo "[RuntipiOS] NetworkManager actif"
         break
     fi
+    echo "[RuntipiOS] Attente NetworkManager ($i/30)..."
     sleep 1
 done
 
 # Attendre un peu pour que les interfaces réseau soient détectées
-sleep 5
+echo "[RuntipiOS] Attente de la détection des interfaces réseau..."
+sleep 10
 
 # Vérifier si on a une connexion réseau (Ethernet ou WiFi)
 HAS_NETWORK=false
 
+echo "[RuntipiOS] Vérification des connexions réseau..."
+
 # Vérifier Ethernet
 if ip link show eth0 2>/dev/null | grep -q "state UP"; then
-    echo "[RuntipiOS] Connexion Ethernet détectée"
-    HAS_NETWORK=true
+    echo "[RuntipiOS] ✓ Connexion Ethernet détectée (eth0 UP)"
+    # Vérifier si Ethernet a une IP
+    if ip addr show eth0 2>/dev/null | grep -q "inet "; then
+        echo "[RuntipiOS] ✓ Ethernet a une adresse IP"
+        HAS_NETWORK=true
+    else
+        echo "[RuntipiOS] ⚠ Ethernet UP mais pas d'IP"
+    fi
+else
+    echo "[RuntipiOS] ✗ Pas de connexion Ethernet"
 fi
 
 # Vérifier WiFi
 if nmcli -t -f GENERAL.STATE dev show wlan0 2>/dev/null | grep -q "100"; then
-    echo "[RuntipiOS] Connexion WiFi détectée"
+    echo "[RuntipiOS] ✓ Connexion WiFi détectée (wlan0 connecté)"
     HAS_NETWORK=true
+else
+    echo "[RuntipiOS] ✗ Pas de connexion WiFi"
 fi
 
 # Vérifier la connectivité globale
 if nmcli -t g 2>/dev/null | grep -q "full"; then
-    echo "[RuntipiOS] Connectivité complète détectée"
+    echo "[RuntipiOS] ✓ Connectivité complète détectée"
     HAS_NETWORK=true
+else
+    echo "[RuntipiOS] ✗ Pas de connectivité globale"
 fi
 
-# Si on a le réseau, lancer l'installation de Runtipi
+# Test ping pour confirmer
+if ping -c 1 -W 5 8.8.8.8 >/dev/null 2>&1; then
+    echo "[RuntipiOS] ✓ Ping vers 8.8.8.8 réussi"
+    HAS_NETWORK=true
+else
+    echo "[RuntipiOS] ✗ Impossible de pinguer 8.8.8.8"
+fi
+
+echo "[RuntipiOS] ============================================"
 if [ "$HAS_NETWORK" = true ]; then
-    echo "[RuntipiOS] Démarrage de l'installation de Runtipi..."
+    echo "[RuntipiOS] RÉSEAU DÉTECTÉ - Démarrage de l'installation de Runtipi"
     touch "$CONFIGURED"
     systemctl start runtipi-installer.service
     systemctl disable --now runtipios-first-boot.service
+    echo "[RuntipiOS] ✓ Installation de Runtipi lancée"
     exit 0
+else
+    echo "[RuntipiOS] AUCUN RÉSEAU - Lancement du portail WiFi"
+    echo "[RuntipiOS] SSID: ${CONFIG_wifi_connect_ssid}"
+    echo "[RuntipiOS] ============================================"
+    exec /usr/local/bin/wifi-connect --portal-ssid "${CONFIG_wifi_connect_ssid}" --ui-directory "/etc/runtipi/ui"
 fi
-
-# Pas de réseau, lancer le portail WiFi
-echo "[RuntipiOS] Aucune connexion réseau, lancement du portail WiFi..."
-exec /usr/local/bin/wifi-connect --portal-ssid "${CONFIG_wifi_connect_ssid}" --ui-directory "/etc/runtipi/ui"
 BOOTEOF
 chmod +x /usr/local/bin/runtipios-first-boot.sh
 
@@ -422,18 +453,36 @@ chmod +x /usr/local/bin/expand-rootfs.sh
 cat > /etc/systemd/system/runtipios-first-boot.service <<'E2'
 [Unit]
 Description=RuntipiOS First Boot Logic
-After=network-online.target NetworkManager.service
+After=network-online.target NetworkManager.service systemd-networkd.service
 Wants=network-online.target
 Before=getty@tty1.service
+Conflicts=getty@tty1.service
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/runtipios-first-boot.sh
 RemainAfterExit=yes
 StandardOutput=journal+console
 StandardError=journal+console
+TimeoutStartSec=300
+Restart=no
 [Install]
 WantedBy=multi-user.target
 E2
+
+# Service pour forcer l'arrêt du login si nécessaire
+cat > /etc/systemd/system/runtipios-block-login.service <<'BLOCK'
+[Unit]
+Description=Block Login Screen During First Boot
+After=runtipios-first-boot.service
+Before=getty@tty1.service
+Conflicts=getty@tty1.service
+[Service]
+Type=oneshot
+ExecStart=/bin/true
+RemainAfterExit=yes
+[Install]
+WantedBy=multi-user.target
+BLOCK
 
 cat > /etc/systemd/system/runtipi-installer.service <<'E3'
 [Unit]
@@ -480,7 +529,7 @@ chroot "$MOUNT_DIR" /bin/bash "/tmp/run.sh" || {
 rm -f "${MOUNT_DIR}/tmp/run.sh"
 
 log_info "Activation des services..."
-for service in expand-rootfs.service runtipios-first-boot.service avahi-daemon.service; do
+for service in expand-rootfs.service runtipios-first-boot.service runtipios-block-login.service avahi-daemon.service; do
     ln -sf "/etc/systemd/system/${service}" "${MOUNT_DIR}/etc/systemd/system/multi-user.target.wants/${service}"
 done
 

@@ -651,10 +651,12 @@ NC='\033[0m'
 # Fonction pour obtenir l'adresse IP d'une interface
 get_ip() {
     local interface=$1
-    ip addr show "$interface" 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1
+    ip addr show "$interface" 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1 || echo ""
 }
 
 # Obtenir les adresses IP
+ETH_IP=""
+WLAN_IP=""
 ETH_IP=$(get_ip eth0)
 WLAN_IP=$(get_ip wlan0)
 

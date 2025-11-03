@@ -657,8 +657,13 @@ get_ip() {
 # Obtenir les adresses IP
 ETH_IP=""
 WLAN_IP=""
-ETH_IP=$(get_ip eth0)
-WLAN_IP=$(get_ip wlan0)
+
+# Utiliser des variables temporaires pour éviter les erreurs unbound
+temp_eth_ip=$(get_ip eth0 2>/dev/null || echo "")
+temp_wlan_ip=$(get_ip wlan0 2>/dev/null || echo "")
+
+ETH_IP="${temp_eth_ip}"
+WLAN_IP="${temp_wlan_ip}"
 
 # Afficher le MOTD
 cat << EOF

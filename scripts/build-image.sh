@@ -245,11 +245,32 @@ ExecStart=-/sbin/agetty --autologin ${CONFIG_system_default_user} --noclear %I \
 AUTOLOGIN
     echo "[CHROOT] ✓ Autologin configuré pour getty@tty1"
     
-    # S'assurer que getty@tty1 est activé
-    systemctl enable getty@tty1.service || true
-    echo "[CHROOT] ✓ Service getty@tty1 activé avec autologin"
+    # Créer un service qui attend la création de l'utilisateur avant d'activer l'autologin
+    cat > /etc/systemd/system/runtipios-autologin.service <<AUTOLOGINSERVICE
+[Unit]
+Description=RuntipiOS Autologin Setup
+After=userconfig.service
+Requires=userconfig.service
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c 'while ! id ${CONFIG_system_default_user} >/dev/null 2>&1; do sleep 1; done; systemctl restart getty@tty1.service'
+RemainAfterExit=yes
+[Install]
+WantedBy=multi-user.target
+AUTOLOGINSERVICE
+    
+    systemctl enable runtipios-autologin.service
+    echo "[CHROOT] ✓ Service autologin activé"
 else
-    echo "[CHROOT] Autologin désactivé (selon config.yml)"
+    echo "[CHROOT] Autologin désactivé (mode appliance comme Home Assistant)"
+    # Mode appliance : désactiver complètement l'autologin et le MOTD
+    mkdir -p /etc/systemd/system/getty@tty1.service.d
+    cat > /etc/systemd/system/getty@tty1.service.d/no-autologin.conf <<NOAUTOLOGIN
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --noclear %I \$TERM
+NOAUTOLOGIN
+    echo "[CHROOT] ✓ Mode appliance configuré - pas d'autologin, pas de MOTD"
 fi
 
 # Configuration du .bashrc pour lancer le script au premier login (seulement si autologin)
@@ -341,6 +362,8 @@ echo "============================================"
 cat > /etc/runtipi/runtime.conf << RUNTIMECONF
 WIFI_CONNECT_SSID="${CONFIG_wifi_connect_ssid}"
 SYSTEM_HOSTNAME="${CONFIG_system_hostname}"
+SYSTEM_AUTOLOGIN="${CONFIG_system_autologin}"
+SYSTEM_DEFAULT_USER="${CONFIG_system_default_user}"
 RUNTIMECONF
 
 cat > /usr/local/bin/runtipios-first-boot.sh << 'BOOTEOF'
@@ -358,7 +381,35 @@ else
     echo "[RuntipiOS] ✗ ERREUR: Configuration runtime introuvable!"
     WIFI_CONNECT_SSID="RuntipiOS-Setup"
     SYSTEM_HOSTNAME="runtipios"
+    SYSTEM_AUTOLOGIN="false"
+    SYSTEM_DEFAULT_USER="runtipi"
 fi
+
+# Attendre que l'utilisateur soit créé par userconfig.service
+echo "[RuntipiOS] Attente de la création de l'utilisateur..."
+for i in {1..30}; do
+    if id "${SYSTEM_DEFAULT_USER}" &>/dev/null; then
+        echo "[RuntipiOS] ✓ Utilisateur trouvé"
+        break
+    fi
+    echo "[RuntipiOS] Attente utilisateur ($i/30)..."
+    sleep 1
+done
+
+# Vérifier si l'utilisateur existe maintenant
+if ! id "${SYSTEM_DEFAULT_USER}" &>/dev/null; then
+    echo "[RuntipiOS] ✗ ERREUR: Utilisateur toujours introuvable après 30 secondes!"
+    echo "[RuntipiOS] Vérification du fichier userconf.txt..."
+    if [ -f /boot/firmware/userconf.txt ]; then
+        echo "[RuntipiOS] userconf.txt trouvé:"
+        cat /boot/firmware/userconf.txt
+    else
+        echo "[RuntipiOS] ✗ userconf.txt introuvable!"
+    fi
+    exit 1
+fi
+
+# Note: L'autologin est maintenant géré par runtipios-autologin.service
 
 # Fichier marqueur de configuration
 CONFIGURED="/etc/runtipi/configured"
@@ -584,22 +635,75 @@ E3
 
 echo "[CHROOT] ✓ Services créés"
 
-cat > /etc/motd << 'MOTDEOF'
-\033[1;34m
+# Créer un script dynamique pour le MOTD
+cat > /usr/local/bin/runtipios-motd.sh << 'MOTDSCRIPT'
+#!/bin/bash
+# Script dynamique pour afficher le MOTD avec les adresses IP
+
+# Couleurs
+BLUE='\033[1;34m'
+GREEN='\033[1;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[1;36m'
+NC='\033[0m'
+
+# Fonction pour obtenir l'adresse IP d'une interface
+get_ip() {
+    local interface=$1
+    ip addr show "$interface" 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1
+}
+
+# Obtenir les adresses IP
+ETH_IP=$(get_ip eth0)
+WLAN_IP=$(get_ip wlan0)
+
+# Afficher le MOTD
+cat << EOF
+${BLUE}
 ╔═══════════════════════════════════════════════════════════════════════╗
 ║                                                                       ║
-║                          \033[1;32mRUNTIPIOS\033[1;34m                                   ║
-║                     \033[1;37mHomeserver Management\033[1;34m                             ║
+║                          ${GREEN}RUNTIPIOS${BLUE}                                   ║
+║                     ${NC}Homeserver Management${BLUE}                             ║
 ║                                                                       ║
 ╠═══════════════════════════════════════════════════════════════════════╣
-║  \033[1;33m⚠️  IMPORTANT : Changez votre mot de passe SSH par défaut !\033[1;34m         ║
-║       \033[1;37mPour cela, tapez simplement la commande : \033[1;36m`passwd`\033[1;34m             ║
+EOF
+
+# Afficher les adresses IP si disponibles
+if [ -n "$ETH_IP" ]; then
+    printf "║   ${NC}🌐 Ethernet: ${CYAN}%-15s${BLUE}                                    ║\\n" "$ETH_IP"
+fi
+if [ -n "$WLAN_IP" ]; then
+    printf "║   ${NC}📶 WiFi:     ${CYAN}%-15s${BLUE}                                    ║\\n" "$WLAN_IP"
+fi
+
+# Si aucune IP, afficher un message
+if [ -z "$ETH_IP" ] && [ -z "$WLAN_IP" ]; then
+    echo "║   ${YELLOW}⚠️  Configuration réseau en cours...${BLUE}                           ║"
+fi
+
+cat << EOF
 ╠═══════════════════════════════════════════════════════════════════════╣
-║   \033[1;37m🌐 Accès Web: \033[4;36mhttp://runtipios.local\033[0m\033[1;34m (après installation)          ║
-║   \033[1;37m🔐 Accès SSH: \033[4;36mssh ${CONFIG_system_default_user}@runtipios.local\033[0m\033[1;34m                          ║
+║   ${NC}🌐 Web UI:    ${CYAN}http://runtipios.local${BLUE}                           ║
+║   ${NC}🔐 SSH:       ${CYAN}ssh runtipi@runtipios.local${BLUE}                      ║
 ╚═══════════════════════════════════════════════════════════════════════╝
-\033[0m
+${NC}
+EOF
+MOTDSCRIPT
+
+chmod +x /usr/local/bin/runtipios-motd.sh
+
+# Configurer le MOTD dynamique (seulement si autologin activé)
+if [ "${CONFIG_system_autologin}" = "true" ]; then
+    cat > /etc/motd << 'MOTDEOF'
+# RuntipiOS MOTD dynamique
+/usr/local/bin/runtipios-motd.sh
 MOTDEOF
+    echo "[CHROOT] ✓ MOTD dynamique configuré"
+else
+    # Mode appliance : pas de MOTD
+    echo "" > /etc/motd
+    echo "[CHROOT] ✓ MOTD désactivé (mode appliance)"
+fi
 
 echo "============================================"
 echo "[CHROOT] ✓ Personnalisation terminée avec succès !"
@@ -623,6 +727,12 @@ log_info "Activation des services..."
 for service in expand-rootfs.service avahi-daemon.service; do
     ln -sf "/etc/systemd/system/${service}" "${MOUNT_DIR}/etc/systemd/system/multi-user.target.wants/${service}"
 done
+
+# Activer runtipios-autologin.service seulement si autologin est activé
+if [ "${CONFIG_system_autologin}" = "true" ]; then
+    ln -sf "/etc/systemd/system/runtipios-autologin.service" "${MOUNT_DIR}/etc/systemd/system/multi-user.target.wants/runtipios-autologin.service"
+    log_info "Service runtipios-autologin.service activé"
+fi
 
 # Activer runtipios-first-boot.service seulement si autologin est désactivé
 if [ "${CONFIG_system_autologin}" != "true" ]; then

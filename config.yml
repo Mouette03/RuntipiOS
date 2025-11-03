@@ -23,7 +23,9 @@ system:
   default_user: "runtipi"
   default_password: "runtipi"
   # Activer l'autologin en console pour le débogage (true/false)
-  autologin: true
+  # false = mode appliance comme Home Assistant (pas d'autologin, pas de MOTD)
+  # true = mode développement avec autologin et MOTD dynamique
+  autologin: false
 
 # -- Configuration de Runtipi --
 runtipi:

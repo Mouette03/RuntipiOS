@@ -141,6 +141,7 @@ CONFIG_system_wifi_country="${CONFIG_system_wifi_country}"
 CONFIG_system_default_user="${CONFIG_system_default_user}"
 CONFIG_system_default_password="${CONFIG_system_default_password}"
 CONFIG_system_autologin="${CONFIG_system_autologin}"
+CONFIG_system_show_motd="${CONFIG_system_show_motd}"
 CONFIG_raspios_arch="${CONFIG_raspios_arch}"
 CONFIG_wifi_connect_version="${CONFIG_wifi_connect_version}"
 CONFIG_wifi_connect_ssid="${CONFIG_wifi_connect_ssid}"
@@ -692,15 +693,15 @@ MOTDSCRIPT
 
 chmod +x /usr/local/bin/runtipios-motd.sh
 
-# Configurer le MOTD dynamique (seulement si autologin activé)
-if [ "${CONFIG_system_autologin}" = "true" ]; then
+# Configurer le MOTD dynamique (seulement si autologin activé ou show_motd demandé)
+if [ "${CONFIG_system_autologin}" = "true" ] || [ "${CONFIG_system_show_motd}" = "true" ]; then
     cat > /etc/motd << 'MOTDEOF'
 # RuntipiOS MOTD dynamique
 /usr/local/bin/runtipios-motd.sh
 MOTDEOF
     echo "[CHROOT] ✓ MOTD dynamique configuré"
 else
-    # Mode appliance : pas de MOTD
+    # Mode appliance pur : pas de MOTD
     echo "" > /etc/motd
     echo "[CHROOT] ✓ MOTD désactivé (mode appliance)"
 fi

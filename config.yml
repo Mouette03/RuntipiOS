@@ -26,6 +26,9 @@ system:
   # false = mode appliance comme Home Assistant (pas d'autologin, pas de MOTD)
   # true = mode développement avec autologin et MOTD dynamique
   autologin: false
+  # Afficher le MOTD même en mode appliance (true/false)
+  # Utile pour voir les adresses IP après connexion SSH
+  show_motd: false
 
 # -- Configuration de Runtipi --
 runtipi:

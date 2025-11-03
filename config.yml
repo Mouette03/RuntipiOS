@@ -28,7 +28,7 @@ system:
   autologin: false
   # Afficher le MOTD même en mode appliance (true/false)
   # Utile pour voir les adresses IP après connexion SSH
-  show_motd: false
+  show_motd: true
 
 # -- Configuration de Runtipi --
 runtipi:

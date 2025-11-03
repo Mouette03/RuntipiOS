@@ -666,7 +666,7 @@ ETH_IP="${temp_eth_ip}"
 WLAN_IP="${temp_wlan_ip}"
 
 # Afficher le MOTD
-cat << EOF
+cat << 'EOF'
 ${BLUE}
 ╔═══════════════════════════════════════════════════════════════════════╗
 ║                                                                       ║
@@ -677,19 +677,19 @@ ${BLUE}
 EOF
 
 # Afficher les adresses IP si disponibles
-if [ -n "$ETH_IP" ]; then
-    printf "║   ${NC}🌐 Ethernet: ${CYAN}%-15s${BLUE}                                    ║\\n" "$ETH_IP"
+if [ -n "${ETH_IP}" ]; then
+    printf "║   ${NC}🌐 Ethernet: ${CYAN}%-15s${BLUE}                                    ║\\n" "${ETH_IP}"
 fi
-if [ -n "$WLAN_IP" ]; then
-    printf "║   ${NC}📶 WiFi:     ${CYAN}%-15s${BLUE}                                    ║\\n" "$WLAN_IP"
+if [ -n "${WLAN_IP}" ]; then
+    printf "║   ${NC}📶 WiFi:     ${CYAN}%-15s${BLUE}                                    ║\\n" "${WLAN_IP}"
 fi
 
 # Si aucune IP, afficher un message
-if [ -z "$ETH_IP" ] && [ -z "$WLAN_IP" ]; then
+if [ -z "${ETH_IP}" ] && [ -z "${WLAN_IP}" ]; then
     echo "║   ${YELLOW}⚠️  Configuration réseau en cours...${BLUE}                           ║"
 fi
 
-cat << EOF
+cat << 'EOF'
 ╠═══════════════════════════════════════════════════════════════════════╣
 ║   ${NC}🌐 Web UI:    ${CYAN}http://runtipios.local${BLUE}                           ║
 ║   ${NC}🔐 SSH:       ${CYAN}ssh runtipi@runtipios.local${BLUE}                      ║

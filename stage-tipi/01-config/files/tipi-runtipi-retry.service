@@ -1,0 +1,15 @@
+[Unit]
+Description=TipiOS — retry runTipi installation after failure
+After=network-online.target docker.service
+Wants=network-online.target
+ConditionPathExists=/boot/firmware/tipi-install-failed.flag
+
+[Service]
+Type=oneshot
+ExecStart=/opt/tipi-setup/retry-runtipi.sh
+StandardOutput=journal
+StandardError=journal
+RemainAfterExit=no
+
+[Install]
+WantedBy=multi-user.target

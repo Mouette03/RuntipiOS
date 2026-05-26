@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TipiOS — {% block title %}Configuration{% endblock %}</title>
+  <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0f1117;
+      --surface:  #1a1d27;
+      --border:   #2a2d3e;
+      --accent:   #E8432A;
+      --accent2:  #F5C518;
+      --success:  #22c55e;
+      --error:    #ef4444;
+      --warn:     #f59e0b;
+      --text:     #e2e8f0;
+      --muted:    #64748b;
+      --radius:   12px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1rem;
+    }
+
+    header {
+      width: 100%;
+      max-width: 560px;
+      padding: 1.5rem 0 0.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .logo { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.5px; }
+    .logo span { color: var(--accent2); }
+    .logo-icon { display:block; margin-bottom:0.1rem; }
+
+    /* Stepper */
+    .steps {
+      display: flex;
+      gap: 0;
+      margin: 1.5rem 0 0;
+      width: 100%;
+      max-width: 560px;
+    }
+    .step {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      position: relative;
+    }
+    .step:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      width: 100%;
+      height: 2px;
+      background: var(--border);
+    }
+    .step.done::after  { background: var(--accent); }
+    .step-dot {
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.65rem; font-weight: 700;
+      position: relative; z-index: 1;
+      color: var(--muted);
+    }
+    .step.active .step-dot { border-color: var(--accent); color: var(--accent); }
+    .step.done   .step-dot { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .step-label { font-size: 0.65rem; color: var(--muted); text-align: center; }
+    .step.active .step-label { color: var(--text); }
+    .step.done   .step-label { color: var(--accent2); }
+
+    /* Card */
+    main {
+      width: 100%;
+      max-width: 560px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.75rem;
+      margin-top: 1.25rem;
+    }
+
+    h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .subtitle { font-size: 0.82rem; color: var(--muted); margin-bottom: 1.25rem; }
+
+    /* Formulaire */
+    .field { margin-bottom: 1rem; }
+    label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.35rem; }
+    input, select, textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.9rem;
+      padding: 0.6rem 0.75rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+    textarea { resize: vertical; min-height: 80px; font-family: monospace; font-size: 0.78rem; }
+
+    /* Boutons */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+      padding: 0.65rem 1.25rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-secondary { background: var(--border); color: var(--text); }
+    .btn-secondary:hover { opacity: 0.8; }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-full { width: 100%; }
+
+    /* Alertes */
+    .alert {
+      padding: 0.65rem 0.9rem;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      margin-bottom: 1rem;
+      border-left: 3px solid;
+    }
+    .alert-error   { background: #2d1515; border-color: var(--error);   color: #fca5a5; }
+    .alert-success { background: #0f2d1a; border-color: var(--success); color: #86efac; }
+    .alert-info    { background: #1a1d2e; border-color: var(--accent);  color: var(--accent2); }
+
+    /* Checkbox */
+    .check-row {
+      display: flex; align-items: flex-start; gap: 0.6rem;
+      font-size: 0.82rem; color: var(--muted); cursor: pointer;
+    }
+    .check-row input[type=checkbox] { width: auto; margin-top: 2px; accent-color: var(--accent); }
+
+    /* Collapsible */
+    details summary {
+      cursor: pointer; font-size: 0.82rem;
+      color: var(--muted); padding: 0.5rem 0;
+      list-style: none; display: flex; align-items: center; gap: 0.4rem;
+    }
+    details summary::before { content: '▶'; font-size: 0.6rem; }
+    details[open] summary::before { content: '▼'; }
+    details .inner { padding-top: 0.75rem; border-top: 1px solid var(--border); margin-top: 0.5rem; }
+
+    footer {
+      margin-top: 1.5rem;
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-align: center;
+    }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <div style="position:fixed;top:0.75rem;right:0.75rem;z-index:100;display:flex;align-items:center;gap:0.4rem;
+              background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:0.25rem 0.5rem">
+    <span style="font-size:1rem;line-height:1">🌐</span>
+    <select onchange="location='/lang?code='+this.value"
+            style="background:transparent;color:var(--text);border:none;font-size:0.82rem;
+                   cursor:pointer;outline:none;padding:0;appearance:none;-webkit-appearance:none">
+      {% for code in supported_langs %}
+      <option value="{{ code }}" {% if code == lang %}selected{% endif %}
+              style="background:var(--surface);color:var(--text)">
+        {{ lang_labels[code] }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  <header>
+    <img src="/static/favicon.ico" alt="TipiOS" style="width:56px;height:56px;margin-bottom:0.25rem;">
+    <div class="logo">Tipi<span>OS</span></div>
+    <div class="tagline">{{ t('tagline') }}</div>
+
+    <nav class="steps">
+      {% set steps = [(t('step_system'), 'configure'), (t('step_install'), 'progress')] %}
+      {% for label, route in steps %}
+        {% set is_active = request.path.startswith('/' ~ route) %}
+        {% set is_done   = loop.index < loop.index0 + 1 %}
+        <div class="step {% if is_active %}active{% endif %}">
+          <div class="step-dot">{{ loop.index }}</div>
+          <div class="step-label">{{ label }}</div>
+        </div>
+      {% endfor %}
+    </nav>
+  </header>
+
+  <main>{% block content %}{% endblock %}</main>
+
+  <footer>TipiOS · Raspberry Pi OS Trixie · <a href="https://runtipi.io" style="color:var(--accent2)">runtipi.io</a></footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

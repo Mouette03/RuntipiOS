@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}{{ t('page_progress_title') }}{% endblock %}
+
+{% block content %}
+<h2>{{ t('progress_h2') }}</h2>
+<p class="subtitle">{{ t('progress_subtitle') }}</p>
+
+<!-- Carte résultat final (masquée jusqu'à la fin) -->
+<div id="result-card" style="display:none;margin-bottom:1.25rem">
+  <div class="alert alert-success" style="font-size:0.95rem">
+    <strong>{{ t('result_done') }}</strong><br>
+    {{ t('result_access') }}<br>
+    <span id="result-links"></span>
+  </div>
+  <div style="margin-top:1rem;text-align:center">
+    <button id="reboot-btn" onclick="doReboot()"
+      style="padding:0.65rem 1.5rem;font-size:0.9rem;border-radius:var(--radius);
+             border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:600">
+      {{ t('btn_reboot') }}
+    </button>
+    <p id="reboot-msg" style="display:none;color:var(--muted);font-size:0.82rem;margin-top:0.6rem">
+      {{ t('reboot_msg') }}
+    </p>
+  </div>
+</div>
+
+<!-- Barre de progression -->
+<div style="background:var(--bg);border-radius:8px;overflow:hidden;height:6px;margin-bottom:1rem">
+  <div id="progress-bar" style="height:100%;background:var(--accent);width:0%;transition:width 0.4s ease"></div>
+</div>
+
+<!-- Log en temps réel -->
+<div id="log-container" style="
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.85rem;
+  font-family: monospace;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  max-height: 400px;
+  overflow-y: auto;
+  min-height: 120px;
+">
+  <span style="color:var(--muted)">{{ t('log_waiting') }}</span>
+</div>
+
+<div id="spinner" style="text-align:center;margin-top:1rem;color:var(--muted);font-size:0.82rem">
+  <span class="spin">⟳</span> {{ t('spinner_msg') }}
+</div>
+{% endblock %}
+
+{% block head %}
+<style>
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spin { display: inline-block; animation: spin 1.2s linear infinite; }
+
+  .log-step    { color: #93c5fd; font-weight: bold; }
+  .log-success { color: #86efac; }
+  .log-error   { color: #fca5a5; }
+  .log-log     { color: #94a3b8; }
+  .log-final   { color: #fde68a; font-weight: bold; }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<!-- Script après le DOM : les getElementById fonctionnent correctement -->
+<script>
+  const I18N = {
+    fallback_links: {{ t('fallback_links')|tojson }},
+    btn_rebooting:  {{ t('btn_rebooting')|tojson }},
+  };
+
+  const STEPS = [
+    "hostname", "timezone", "locale", "utilisateur", "ssh", "ip",
+    "apt update", "apt upgrade", "runtipi"
+  ];
+  let stepCount = 0;
+  let nextIdx   = 0;
+  let pollTimer = null;
+
+  const logEl   = document.getElementById("log-container");
+  const barEl   = document.getElementById("progress-bar");
+  const spinner = document.getElementById("spinner");
+  let firstEntry = true;
+
+  function appendLog(msg, level) {
+    if (firstEntry) { logEl.innerHTML = ""; firstEntry = false; }
+    const line = document.createElement("div");
+    line.className = "log-" + level;
+    const prefix = { step:"▶ ", success:"✔ ", error:"✖ ", final:"★ ", log:"  " }[level] || "  ";
+    line.textContent = prefix + msg;
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function updateProgress() {
+    const pct = Math.min(95, Math.round((stepCount / (STEPS.length + 1)) * 100));
+    barEl.style.width = pct + "%";
+  }
+
+  function handleFinal(data) {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    barEl.style.width = "100%";
+    spinner.style.display = "none";
+
+    const card  = document.getElementById("result-card");
+    const links = document.getElementById("result-links");
+    card.style.display = "";
+
+    const ip       = data.ip;
+    const hostname = data.hostname;
+    let html = "";
+    if (ip) {
+      html += `<a href="http://${ip}" target="_blank" style="color:#6ee7b7">http://${ip}</a>`;
+    }
+    if (hostname) {
+      html += (ip ? " &nbsp;|&nbsp; " : "") +
+        `<a href="http://${hostname}.local" target="_blank" style="color:#6ee7b7">http://${hostname}.local</a>`;
+    }
+    links.innerHTML = html || I18N.fallback_links;
+  }
+
+  async function poll() {
+    try {
+      const resp = await fetch(`/progress/log?from=${nextIdx}`);
+      if (!resp.ok) return;
+      const data = await resp.json();
+
+      for (const entry of data.entries) {
+        nextIdx++;
+        if (entry.level === "final") {
+          appendLog(entry.msg, "final");
+          handleFinal(entry);
+          return;  // handleFinal a arrêté le polling
+        }
+        appendLog(entry.msg, entry.level);
+        if (entry.level === "step") { stepCount++; updateProgress(); }
+      }
+
+      if (data.done) {
+        // setup terminé mais pas d'entrée "final" (erreur) — on arrête
+        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        spinner.style.display = "none";
+      }
+    } catch (_) { /* réseau temporairement indisponible, on réessaye */ }
+  }
+
+  async function doReboot() {
+    const btn = document.getElementById("reboot-btn");
+    const msg = document.getElementById("reboot-msg");
+    btn.disabled = true;
+    btn.textContent = I18N.btn_rebooting;
+    try { await fetch("/reboot", { method: "POST" }); } catch (_) {}
+    btn.style.display = "none";
+    msg.style.display = "";
+  }
+
+  // Premier appel immédiat, puis toutes les secondes
+  poll();
+  pollTimer = setInterval(poll, 1000);
+</script>
+{% endblock %}

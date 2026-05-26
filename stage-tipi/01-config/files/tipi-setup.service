@@ -1,0 +1,21 @@
+[Unit]
+Description=TipiOS — Premier démarrage : configuration et installation
+Documentation=https://github.com/votre-repo/tipiOS
+After=network-pre.target avahi-daemon.service
+Wants=avahi-daemon.service
+ConditionPathExists=/var/lib/tipi-setup/.not-configured
+
+[Service]
+Type=simple
+ExecStart=/opt/tipi-setup/start.sh
+StandardOutput=append:/boot/firmware/tipi-setup.log
+StandardError=append:/boot/firmware/tipi-setup.log
+SyslogIdentifier=tipi-setup
+# Redémarre uniquement si crash inattendu, pas si arrêt volontaire (code 0)
+Restart=on-failure
+RestartSec=10
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Install]
+WantedBy=multi-user.target

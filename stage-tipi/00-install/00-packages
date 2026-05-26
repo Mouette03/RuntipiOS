@@ -1,0 +1,15 @@
+python3-flask
+python3-full
+openssh-server
+openssh-client
+avahi-daemon
+libnss-mdns
+curl
+git
+network-manager
+hostapd
+dnsmasq
+ca-certificates
+wpasupplicant
+iw
+wireless-regdb

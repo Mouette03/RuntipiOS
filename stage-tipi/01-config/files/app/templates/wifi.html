@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% block title %}{{ t('page_wifi_title') }}{% endblock %}
+
+{% block content %}
+<h2>{{ t('wifi_h2') }}</h2>
+<p class="subtitle">{{ t('wifi_subtitle') }}</p>
+
+<div id="alert-box"></div>
+
+<div id="network-list">
+  {% if networks %}
+    {% for net in networks %}
+    <button class="network-item" onclick="selectNetwork('{{ net.ssid|e }}', {{ 'true' if net.has_password else 'false' }})"
+            title="{{ net.ssid }}">
+      <div class="net-info">
+        <span class="net-ssid">{{ net.ssid }}</span>
+        {% if net.security and net.security != '--' %}
+          <span class="net-tag">🔒 {{ net.security }}</span>
+        {% endif %}
+      </div>
+      <div class="signal-bars" title="{{ net.signal }} %">
+        {% set pct = net.signal %}
+        <div class="bar {% if pct >= 25 %}on{% endif %}"></div>
+        <div class="bar {% if pct >= 50 %}on{% endif %}"></div>
+        <div class="bar {% if pct >= 75 %}on{% endif %}"></div>
+        <div class="bar {% if pct >= 90 %}on{% endif %}"></div>
+      </div>
+    </button>
+    {% endfor %}
+  {% else %}
+    <p style="color:var(--muted);font-size:0.85rem;text-align:center;padding:1rem 0">
+      {{ t('wifi_no_networks') }}
+    </p>
+  {% endif %}
+</div>
+
+<div style="display:flex;gap:0.5rem;margin-top:0.75rem">
+  <button class="btn btn-secondary" onclick="rescan()" id="rescan-btn">↺ {{ t('btn_rescan') }}</button>
+</div>
+
+<!-- Formulaire de connexion (affiché après sélection) -->
+<div id="connect-form" style="display:none;margin-top:1.25rem;padding-top:1.25rem;border-top:1px solid var(--border)">
+  <div class="field">
+    <label>{{ t('label_selected_net') }}</label>
+    <input type="text" id="sel-ssid" readonly style="color:var(--accent2)">
+  </div>
+  <div class="field" id="pwd-field">
+    <label>{{ t('label_wifi_password') }}</label>
+    <div style="position:relative">
+      <input type="password" id="pwd" autocomplete="current-password" placeholder="{{ t('placeholder_wifi_password') }}">
+      <button type="button" onclick="togglePwd()" style="
+        position:absolute;right:10px;top:50%;transform:translateY(-50%);
+        background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem">👁</button>
+    </div>
+  </div>
+  <button class="btn btn-primary btn-full" id="connect-btn" onclick="connect()">{{ t('btn_connect') }}</button>
+</div>
+{% endblock %}
+
+{% block head %}
+<style>  .network-item {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.65rem 0.9rem;
+    margin-bottom: 0.5rem;
+    color: var(--text);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    transition: border-color 0.15s, background 0.15s;
+    text-align: left;
+  }
+  .network-item:hover, .network-item.selected {
+    border-color: var(--accent);
+    background: #1e2035;
+  }
+  .net-info { display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+  .net-ssid { font-size: 0.9rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .net-tag  { font-size: 0.7rem; color: var(--muted); }
+  .signal-bars { display: flex; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+  .bar {
+    width: 5px; border-radius: 2px; background: var(--border);
+  }
+  .bar:nth-child(1) { height: 6px; }
+  .bar:nth-child(2) { height: 10px; }
+  .bar:nth-child(3) { height: 14px; }
+  .bar:nth-child(4) { height: 18px; }
+  .bar.on { background: var(--accent2); }
+</style>
+<script>
+  const I18N = {
+    connecting:     {{ t('js_connecting')|tojson }},
+    connected:      {{ t('js_connected')|tojson }},
+    connect_fail:   {{ t('js_connect_fail')|tojson }},
+    unknown_error:  {{ t('js_unknown_error')|tojson }},
+    scanning_short: {{ t('js_scanning_short')|tojson }},
+    no_networks:    {{ t('wifi_no_networks')|tojson }},
+  };
+
+  let selectedSsid = "";
+  let selectedHasPwd = false;
+
+  function selectNetwork(ssid, hasPwd) {
+    selectedSsid = ssid;
+    selectedHasPwd = hasPwd;
+    document.querySelectorAll(".network-item").forEach(el => el.classList.remove("selected"));
+    event.currentTarget.classList.add("selected");
+    document.getElementById("sel-ssid").value = ssid;
+    document.getElementById("pwd-field").style.display = hasPwd ? "" : "none";
+    document.getElementById("connect-form").style.display = "";
+    if (hasPwd) document.getElementById("pwd").focus();
+  }
+
+  function togglePwd() {
+    const p = document.getElementById("pwd");
+    p.type = p.type === "password" ? "text" : "password";
+  }
+
+  async function connect() {
+    const btn = document.getElementById("connect-btn");
+    btn.disabled = true;
+    btn.textContent = I18N.connecting;
+    clearAlert();
+
+    const resp = await fetch("/wifi/connect", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ssid: selectedSsid, password: document.getElementById("pwd").value })
+    });
+    const data = await resp.json();
+
+    if (data.success) {
+      showAlert(I18N.connected.replace("{ssid}", selectedSsid), "success");
+      setTimeout(() => window.location.href = "/configure", 1500);
+    } else {
+      showAlert(I18N.connect_fail.replace("{e}", data.error || I18N.unknown_error), "error");
+      btn.disabled = false;
+      btn.textContent = I18N.connecting.split("\u2026")[0];
+    }
+  }
+
+  async function rescan() {
+    const btn = document.getElementById("rescan-btn");
+    btn.disabled = true;
+    btn.textContent = "Scan…";
+    const resp = await fetch("/wifi/rescan");
+    const nets = await resp.json();
+    const list = document.getElementById("network-list");
+    if (nets.length === 0) {
+      list.innerHTML = '<p style="color:var(--muted);font-size:0.85rem;text-align:center;padding:1rem 0">Aucun réseau détecté.</p>';
+    } else {
+      list.innerHTML = nets.map(n => `
+        <button class="network-item" onclick="selectNetwork('${n.ssid.replace(/'/g,"\\'")}', ${n.has_password})" title="${n.ssid}">
+          <div class="net-info">
+            <span class="net-ssid">${n.ssid}</span>
+            ${n.security && n.security !== '--' ? `<span class="net-tag">🔒 ${n.security}</span>` : ''}
+          </div>
+          <div class="signal-bars">
+            <div class="bar ${n.signal >= 25 ? 'on' : ''}"></div>
+            <div class="bar ${n.signal >= 50 ? 'on' : ''}"></div>
+            <div class="bar ${n.signal >= 75 ? 'on' : ''}"></div>
+            <div class="bar ${n.signal >= 90 ? 'on' : ''}"></div>
+          </div>
+        </button>`).join("");
+    }
+    btn.disabled = false;
+    btn.textContent = "↺ Actualiser";
+  }
+
+  function showAlert(msg, type) {
+    document.getElementById("alert-box").innerHTML =
+      `<div class="alert alert-${type}">${msg}</div>`;
+  }
+  function clearAlert() {
+    document.getElementById("alert-box").innerHTML = "";
+  }
+
+  // Soumettre avec Entrée
+  document.addEventListener("keydown", e => {
+    if (e.key === "Enter" && selectedSsid) connect();
+  });
+</script>
+{% endblock %}

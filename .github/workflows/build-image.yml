@@ -2,7 +2,8 @@ name: Build RuntipiOS Image
 
 on:
   push:
-    branches: ['**']          # all branches
+    branches: ['**']
+    tags: ['v*']          # all branches
   pull_request:
     branches: ['**']
   workflow_dispatch:
@@ -130,7 +131,7 @@ jobs:
 
           ### First boot
           - **WiFi hotspot**: connect to the \`TipiSetup\` network (no password)
-          - **Portal**: open \`http://tipisetup.local\` or \`http://10.42.0.1\`
+          - **Portal**: open \`http://tipisetup.local:8080\` or \`http://10.42.0.1:8080\`
           - Configure your network, SSH, hostname, then launch the installation
 
           ### Recommended hardware

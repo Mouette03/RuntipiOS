@@ -1,6 +1,6 @@
-[Unit]
-Description=TipiOS — Premier démarrage : configuration et installation
-Documentation=https://github.com/votre-repo/tipiOS
+﻿[Unit]
+Description=RuntipiOS — Premier démarrage : configuration et installation
+Documentation=https://github.com/votre-repo/RuntipiOS
 After=network-pre.target avahi-daemon.service
 Wants=avahi-daemon.service
 ConditionPathExists=/var/lib/tipi-setup/.not-configured

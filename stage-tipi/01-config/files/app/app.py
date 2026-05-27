@@ -1,9 +1,9 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
-TipiOS — Portail de configuration (premier démarrage)
+RuntipiOS — Portail de configuration (premier démarrage)
 Tourne sur le port 8080, accessible via :
-  - http://tipisetup.local   (mDNS Avahi, réseau local)
-  - http://10.42.0.1         (hotspot WiFi TipiSetup)
+  - http://tipisetup.local:8080   (mDNS Avahi, réseau local)
+  - http://10.42.0.1:8080         (hotspot WiFi TipiSetup)
 """
 
 import json
@@ -228,7 +228,7 @@ def apply_config():
     # Validation et nettoyage
     T = get_t(session.get("lang", DEFAULT_LANG))
 
-    hostname = re.sub(r"[^a-zA-Z0-9\-]", "", request.form.get("hostname", "tipios"))[:63] or "tipios"
+    hostname = re.sub(r"[^a-zA-Z0-9\-]", "", request.form.get("hostname", "runtipios"))[:63] or "runtipios"
     username = re.sub(r"[^a-zA-Z0-9_\-]", "", request.form.get("username", ""))[:32]
     password = request.form.get("password", "")
     confirm  = request.form.get("confirm_password", "")
@@ -264,6 +264,7 @@ def apply_config():
 
     wifi_ssid = request.form.get("wifi_ssid", "").strip()
     wifi_password = request.form.get("wifi_password", "").strip()
+    cockpit_enabled = request.form.get("cockpit_enabled") == "1"
 
     _config = {
         "hostname":              hostname,
@@ -279,6 +280,7 @@ def apply_config():
         "static_dns":            static_dns,
         "wifi_ssid":             wifi_ssid,
         "wifi_password":         wifi_password,
+        "cockpit_enabled":       cockpit_enabled,
         "lang":                  session.get("lang", DEFAULT_LANG),
     }
 
@@ -297,7 +299,7 @@ def apply_config():
 def progress_page():
     if not _config:
         return redirect("/")
-    return render_template("progress.html", hostname=_config.get("hostname", "tipios"))
+    return render_template("progress.html", hostname=_config.get("hostname", "runtipios"))
 
 
 # ---------------------------------------------------------------------------
@@ -310,30 +312,6 @@ def _append_log(msg: str, level: str = "log") -> dict:
     return entry
 
 
-def _restore_nft_redirect():
-    """Recrée la redirection nftables 80→8080 (idempotent, sans doublons)."""
-    subprocess.run(["nft", "delete", "table", "ip", "tipi_nat"], capture_output=True)
-    subprocess.run(["nft", "add", "table", "ip", "tipi_nat"], capture_output=True)
-    subprocess.run(["nft", "add", "chain", "ip", "tipi_nat", "prerouting",
-                    "{ type nat hook prerouting priority -150; policy accept; }"],
-                   capture_output=True)
-    for iface in ("wlan0", "eth0"):
-        subprocess.run(["nft", "add", "rule", "ip", "tipi_nat", "prerouting",
-                        "iif", iface, "tcp", "dport", "80", "redirect", "to", ":8080"],
-                       capture_output=True)
-
-
-def _nft_watchdog():
-    """Thread de surveillance — restaure la redirection nftables toutes les 0.5 s
-    pendant l'installation, pour contrer les resets éventuels de Docker/runTipi."""
-    _restore_nft_redirect()  # Restauration immédiate au démarrage du watchdog
-    while not _setup_done:
-        time.sleep(0.5)
-        _restore_nft_redirect()
-    # Restauration finale une fois l'install terminée
-    _restore_nft_redirect()
-
-
 def _run_setup():
     """Thread de configuration système — lit _config, écrit dans _progress_log."""
     global _setup_done
@@ -342,9 +320,6 @@ def _run_setup():
     def done(msg):  _append_log(msg, "success")
     def err(msg):   _append_log(msg, "error")
     def out(msg):   _append_log(msg, "log")
-
-    # Lancer le watchdog nftables en parallèle
-    threading.Thread(target=_nft_watchdog, daemon=True).start()
 
     try:
         _run_setup_inner(step, done, err, out)
@@ -399,7 +374,7 @@ def _run_setup_inner(step, done, err, out):
 
     process.wait()
 
-    hostname = _config.get("hostname", "tipios")
+    hostname = _config.get("hostname", "runtipios")
     ssh_port = _config.get("ssh_port", "22")
 
     # Nettoyage : on désactive le service (ne se relancera plus au prochain boot)

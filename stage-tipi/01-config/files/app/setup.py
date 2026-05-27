@@ -1,6 +1,6 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
-TipiOS — Script d'installation système
+RuntipiOS — Script d'installation système
 Lancé par app.py via subprocess. Toutes les sorties sont capturées et
 relayées en temps réel vers le portail web.
 
@@ -8,7 +8,7 @@ Protocole de sortie :
   TIPI_STEP:<message>   → étape en cours (badge coloré)
   TIPI_DONE:<message>   → étape réussie (badge vert)
   TIPI_ERROR:<message>  → erreur non fatale (badge rouge)
-  TIPI_IP:<adresse>     → IP finale de runTipi
+  TIPI_IP:<adresse>     → IP finale de Runtipi
   <autre>               → log brut (affiché en gris)
 """
 
@@ -21,6 +21,11 @@ import sys
 import time
 
 from translations import get_t
+
+# ---------------------------------------------------------------------------
+# Nettoyage des codes ANSI (couleurs terminal) dans les sorties subprocess
+# ---------------------------------------------------------------------------
+_ANSI_RE = re.compile(r'\x1b\[[0-9;]*[mGKHFABCDJr]')
 
 # ---------------------------------------------------------------------------
 # Traductions — initialisées dans main() après lecture de la config
@@ -252,7 +257,7 @@ def _write_wifi_error(ssid: str, msg: str):
     """Write WiFi error to /boot/firmware so it's readable from any OS."""
     try:
         with open("/boot/firmware/tipi-wifi-error.txt", "w") as f:
-            f.write(f"TipiOS — WiFi connection error\n")
+            f.write(f"RuntipiOS — WiFi connection error\n")
             f.write(f"SSID : {ssid}\n")
             f.write(f"Error: {msg}\n")
     except Exception:
@@ -345,7 +350,7 @@ def install_runtipi(max_attempts: int = 3) -> bool:
             curl.stdout.close()
 
             for line in iter(bash.stdout.readline, ""):
-                line = line.rstrip()
+                line = _ANSI_RE.sub("", line).rstrip()
                 if line:
                     out(line)
 
@@ -378,6 +383,16 @@ def get_final_ip() -> str | None:
     return None
 
 
+def configure_cockpit(enabled: bool):
+    if enabled:
+        step(T["cockpit_step"])
+        subprocess.run(["systemctl", "enable", "--now", "cockpit.socket"], check=False)
+        done(T["cockpit_done"])
+    else:
+        subprocess.run(["systemctl", "disable", "--now", "cockpit.socket"],
+                       check=False, capture_output=True)
+
+
 # ---------------------------------------------------------------------------
 # Point d'entrée
 # ---------------------------------------------------------------------------
@@ -405,7 +420,7 @@ def main():
     # Initialiser les traductions dès que la langue est connue
     T = get_t(cfg.get("lang", "en"))
 
-    hostname             = cfg.get("hostname", "tipios")
+    hostname             = cfg.get("hostname", "runtipios")
     username             = cfg.get("username", "")
     password             = cfg.get("password", "")
     ssh_port             = str(cfg.get("ssh_port", "22"))
@@ -418,6 +433,7 @@ def main():
     static_dns           = cfg.get("static_dns", "8.8.8.8")
     wifi_ssid             = cfg.get("wifi_ssid", "").strip()
     wifi_password         = cfg.get("wifi_password", "").strip()
+    cockpit_enabled       = bool(cfg.get("cockpit_enabled", False))
 
     # Validation minimale
     if not username or not password:
@@ -434,7 +450,7 @@ def main():
     configure_ssh(ssh_port, disable_password_auth, ssh_key)
     configure_static_ip(static_ip, static_gw, static_dns)
     if wifi_ssid:
-        step(T["wifi_hotspot_warn"])
+        step("⚠️ " + T["wifi_hotspot_warn"])
     connect_wifi(wifi_ssid, wifi_password)
     system_update()
     if not install_runtipi():
@@ -444,6 +460,8 @@ def main():
         except Exception:
             pass
         err(T["runtipi_retry_boot"].format(hostname=hostname))
+
+    configure_cockpit(cockpit_enabled)
 
     final_ip = get_final_ip()
     if final_ip:

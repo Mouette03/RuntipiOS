@@ -1,4 +1,4 @@
-name: Build TipiOS Image
+name: Build RuntipiOS Image
 
 on:
   push:
@@ -56,7 +56,7 @@ jobs:
       - name: Create pi-gen config
         run: |
           {
-            echo 'IMG_NAME="tipiOS"'
+            echo 'IMG_NAME="RuntipiOS"'
             echo 'RELEASE="trixie"'
             echo 'DEPLOY_COMPRESSION="xz"'
             echo 'TARGET_HOSTNAME="tipisetup"'
@@ -111,7 +111,7 @@ jobs:
       - name: Upload image as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tipiOS-${{ github.run_number }}-${{ github.sha }}
+          name: RuntipiOS-${{ github.run_number }}-${{ github.sha }}
           path: /tmp/pi-gen/deploy/
           retention-days: 30
 
@@ -121,7 +121,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ github.event.inputs.release_tag || format('build-{0}', github.run_number) }}"
-          BODY="## TipiOS — Ready-to-flash Raspberry Pi image
+          BODY="## RuntipiOS — Ready-to-flash Raspberry Pi image
 
           ### Flashing
           1. Download the \`.img.xz\` file
@@ -141,7 +141,7 @@ jobs:
 
           gh release create "$TAG" \
             --repo "${{ github.repository }}" \
-            --title "TipiOS Build ${{ github.run_number }}" \
+            --title "RuntipiOS Build ${{ github.run_number }}" \
             --notes "$BODY" \
             /tmp/pi-gen/deploy/*.img* 2>/dev/null || \
           gh release upload "$TAG" \

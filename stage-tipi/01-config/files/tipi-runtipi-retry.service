@@ -1,5 +1,5 @@
-[Unit]
-Description=TipiOS — retry runTipi installation after failure
+﻿[Unit]
+Description=RuntipiOS — retry Runtipi installation after failure
 After=network-online.target docker.service
 Wants=network-online.target
 ConditionPathExists=/boot/firmware/tipi-install-failed.flag

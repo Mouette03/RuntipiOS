@@ -8,7 +8,7 @@
 <!-- Carte résultat final (masquée jusqu'à la fin) -->
 <div id="result-card" style="display:none;margin-bottom:1.25rem">
   <div class="alert alert-success" style="font-size:0.95rem">
-    <strong>{{ t('result_done') }}</strong><br>
+    <strong>✅ {{ t('result_done') }}</strong><br>
     {{ t('result_access') }}<br>
     <span id="result-links"></span>
   </div>
@@ -16,7 +16,7 @@
     <button id="reboot-btn" onclick="doReboot()"
       style="padding:0.65rem 1.5rem;font-size:0.9rem;border-radius:var(--radius);
              border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:600">
-      {{ t('btn_reboot') }}
+      🔄 {{ t('btn_reboot') }}
     </button>
     <p id="reboot-msg" style="display:none;color:var(--muted);font-size:0.82rem;margin-top:0.6rem">
       {{ t('reboot_msg') }}
@@ -78,11 +78,14 @@
   let stepCount = 0;
   let nextIdx   = 0;
   let pollTimer = null;
+  let failCount = 0;
+  let polling   = false;
 
-  const logEl   = document.getElementById("log-container");
-  const barEl   = document.getElementById("progress-bar");
-  const spinner = document.getElementById("spinner");
-  let firstEntry = true;
+  const logEl      = document.getElementById("log-container");
+  const barEl      = document.getElementById("progress-bar");
+  const spinner    = document.getElementById("spinner");
+  const spinnerMsg = spinner.innerHTML;
+  let firstEntry   = true;
 
   function appendLog(msg, level) {
     if (firstEntry) { logEl.innerHTML = ""; firstEntry = false; }
@@ -122,9 +125,21 @@
   }
 
   async function poll() {
+    if (polling) return;
+    polling = true;
     try {
-      const resp = await fetch(`/progress/log?from=${nextIdx}`);
-      if (!resp.ok) return;
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 4000);
+      const resp = await fetch(`/progress/log?from=${nextIdx}`, { signal: ctrl.signal });
+      clearTimeout(t);
+      if (!resp.ok) { onFail(); return; }
+
+      // Connexion rétablie après interruption
+      if (failCount > 0) {
+        failCount = 0;
+        spinner.innerHTML = spinnerMsg;
+      }
+
       const data = await resp.json();
 
       for (const entry of data.entries) {
@@ -143,14 +158,20 @@
         if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
         spinner.style.display = "none";
       }
-    } catch (_) { /* réseau temporairement indisponible, on réessaye */ }
+    } catch (_) { onFail(); }
+    finally { polling = false; }
+  }
+
+  function onFail() {
+    failCount++;
+    if (failCount === 5) spinner.innerHTML = '<span class="spin">⟳</span> Reconnexion…';
   }
 
   async function doReboot() {
     const btn = document.getElementById("reboot-btn");
     const msg = document.getElementById("reboot-msg");
     btn.disabled = true;
-    btn.textContent = I18N.btn_rebooting;
+    btn.textContent = "⏳ " + I18N.btn_rebooting;
     try { await fetch("/reboot", { method: "POST" }); } catch (_) {}
     btn.style.display = "none";
     msg.style.display = "";

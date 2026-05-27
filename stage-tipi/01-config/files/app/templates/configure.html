@@ -5,7 +5,7 @@
 <h2>{{ t('configure_h2') }}</h2>
 <p class="subtitle">
   {% if ethernet %}
-    {{ t('subtitle_ethernet') }}{% if current_ip %} — <strong>{{ current_ip }}</strong>{% endif %}
+    ✅ {{ t('subtitle_ethernet') }}{% if current_ip %} — <strong>{{ current_ip }}</strong>{% endif %}
   {% else %}
     {{ t('subtitle_wifi') }}
   {% endif %}
@@ -20,8 +20,8 @@
   <!-- Hostname -->
   <div class="field">
     <label>{{ t('label_hostname') }}</label>
-    <input type="text" name="hostname" value="tipios" pattern="[a-zA-Z0-9\-]+" maxlength="63"
-           placeholder="tipios" required>
+    <input type="text" name="hostname" value="runtipios" pattern="[a-zA-Z0-9\-]+" maxlength="63"
+           placeholder="runtipios" required>
     <small style="color:var(--muted);font-size:0.72rem">
       {{ t('hint_hostname')|safe }}
     </small>
@@ -40,14 +40,18 @@
       <input type="password" name="password" id="pwd1" minlength="8"
              placeholder="{{ t('placeholder_password') }}" required autocomplete="new-password">
       <button type="button" onclick="toggle('pwd1')"
-        style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer">👁</button>
+        style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;line-height:0"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
     </div>
   </div>
 
   <div class="field">
     <label>{{ t('label_confirm') }}</label>
-    <input type="password" name="confirm_password" id="pwd2" minlength="8"
-           placeholder="{{ t('placeholder_confirm') }}" required autocomplete="new-password">
+    <div style="position:relative">
+      <input type="password" name="confirm_password" id="pwd2" minlength="8"
+             placeholder="{{ t('placeholder_confirm') }}" required autocomplete="new-password">
+      <button type="button" onclick="toggle('pwd2')"
+        style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;line-height:0"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+    </div>
   </div>
 
   <div class="field">
@@ -117,16 +121,27 @@
     </div>
   </details>
 
+  <hr style="border:none;border-top:1px solid var(--border);margin:1.25rem 0">
+
+  <!-- Cockpit -->
+  <label class="check-row" style="gap:0.75rem;align-items:flex-start;cursor:pointer">
+    <input type="checkbox" name="cockpit_enabled" value="1" style="margin-top:3px">
+    <span>
+      <strong>{{ t('label_cockpit') }}</strong><br>
+      <small style="color:var(--muted);font-size:0.72rem">{{ t('hint_cockpit')|safe }}</small>
+    </span>
+  </label>
+
   <!-- Connexion WiFi — à la fin, appliquée en dernier par setup.py -->
   <hr style="border:none;border-top:1px solid var(--border);margin:1.25rem 0">
 
   <h3 style="margin-bottom:0.75rem;font-size:1rem">{{ t('h3_wifi')|safe }}</h3>
 
   <div class="alert" id="wifi-warning" style="display:none;background:#fff8e1;color:#5a3e00;border-left:4px solid #f59e0b;padding:0.85rem 1rem;border-radius:var(--radius);margin-bottom:1rem;font-size:0.85rem;line-height:1.55">
-    {{ t('warn_wifi_hotspot')|safe }}
-    <br><code style="font-size:1rem;font-weight:700;display:inline-block;margin-top:0.35rem;color:#7c4f00">http://tipisetup.local</code>
+    ⚠️ {{ t('warn_wifi_hotspot')|safe }}
+    <br><code style="font-size:1rem;font-weight:700;display:inline-block;margin-top:0.35rem;color:#7c4f00">http://tipisetup.local:8080</code>
     <br><span style="color:#7c5e00;font-size:0.78rem">{{ t('warn_wifi_mdns') }}</span>
-    <br><span style="color:#7c5e00;font-size:0.82rem;margin-top:0.5rem;display:inline-block">{{ t('warn_wifi_after_reboot') }} <code style="font-size:0.9rem;font-weight:700;color:#7c4f00">http://<span id="mdns-hostname">tipios</span>.local</code></span>
+    <br><span style="color:#7c5e00;font-size:0.82rem;margin-top:0.5rem;display:inline-block">{{ t('warn_wifi_after_reboot') }} <code style="font-size:0.9rem;font-weight:700;color:#7c4f00">http://<span id="mdns-hostname">runtipios</span>.local</code></span>
   </div>
 
   <div class="field">
@@ -149,13 +164,13 @@
       <input type="password" name="wifi_password" id="wifi_password"
              placeholder="{{ t('placeholder_wifi_password') }}" autocomplete="off">
       <button type="button" onclick="toggle('wifi_password')"
-        style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer">👁</button>
+        style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;line-height:0"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
     </div>
   </div>
 
   <div style="margin-top:1.5rem">
     <button type="submit" class="btn btn-primary btn-full" id="submit-btn">
-      {{ t('btn_submit') }}
+      ▶ {{ t('btn_submit') }}
     </button>
   </div>
 </form>
@@ -203,7 +218,7 @@
             results.style.display = "none";
             document.getElementById("wifi-warning").style.display = "";
             document.getElementById("mdns-hostname").textContent =
-              document.querySelector("input[name='hostname']").value.trim() || "tipios";
+              document.querySelector("input[name='hostname']").value.trim() || "runtipios";
           });
           row.addEventListener("mouseover", () => row.style.background = "var(--border)");
           row.addEventListener("mouseout",  () => row.style.background = "");
@@ -232,7 +247,7 @@
     const mdnsSpan = document.getElementById("mdns-hostname");
     if (hostnameInput && mdnsSpan) {
       hostnameInput.addEventListener("input", () => {
-        mdnsSpan.textContent = hostnameInput.value.trim() || "tipios";
+        mdnsSpan.textContent = hostnameInput.value.trim() || "runtipios";
       });
     }
 

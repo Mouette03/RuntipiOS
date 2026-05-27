@@ -54,6 +54,13 @@ systemctl disable wpa_supplicant.service 2>/dev/null || true
 systemctl enable tipi-setup.service
 systemctl enable tipi-runtipi-retry.service
 systemctl enable avahi-daemon.service
+
+# ---- Cockpit — interface web de gestion système (port 9090) ----
+# Installé ici, mais désactivé par défaut.
+# L'utilisateur peut l'activer via le portail de configuration (case à cocher).
+apt-get install -y cockpit
+systemctl disable cockpit.socket 2>/dev/null || true
+
 # ---- Activer SSH (désactivé par défaut sur Trixie) ----
 systemctl enable ssh.service
 

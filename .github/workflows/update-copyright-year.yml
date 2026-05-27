@@ -1,0 +1,29 @@
+name: Update copyright year
+
+on:
+  schedule:
+    - cron: '0 0 1 1 *'   # 1er janvier à 00:00 UTC
+  workflow_dispatch:        # déclenchement manuel possible
+
+jobs:
+  update-year:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update year in LICENSE
+        run: |
+          CURRENT_YEAR=$(date +%Y)
+          sed -i "s/Copyright (c) [0-9]\{4\} mouette03/Copyright (c) $CURRENT_YEAR mouette03/" LICENSE
+
+      - name: Commit if changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git diff --quiet && echo "No change" && exit 0
+          git add LICENSE
+          git commit -m "chore: update copyright year to $(date +%Y)"
+          git push

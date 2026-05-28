@@ -2,14 +2,11 @@ name: Build RuntipiOS Image
 
 on:
   push:
-    branches: ['**']
-    tags: ['v*']          # all branches
-  pull_request:
-    branches: ['**']
+    tags: ['v*']
   workflow_dispatch:
     inputs:
       release_tag:
-        description: 'Release tag (e.g. v1.0.0)'
+        description: 'Release tag pour publier (ex: v1.0.0) — laisser vide pour un build de test'
         required: false
         default: ''
 
@@ -23,6 +20,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install pi-gen dependencies
         run: |
@@ -116,12 +115,22 @@ jobs:
           path: /tmp/pi-gen/deploy/
           retention-days: 30
 
-      - name: Create GitHub Release
-        if: github.ref == 'refs/heads/main'
+      - name: Attach image to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event.inputs.release_tag != '' && github.event.inputs.release_tag != null)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_TAG: ${{ github.event.inputs.release_tag }}
+          REF_TAG: ${{ github.ref_name }}
         run: |
-          TAG="${{ github.event.inputs.release_tag || format('build-{0}', github.run_number) }}"
+          # Validation stricte du tag (sécurité : évite l'injection de commandes)
+          RAW_TAG="${INPUT_TAG:-$REF_TAG}"
+          if ! echo "$RAW_TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "ERROR: tag invalide : '$RAW_TAG' (attendu : vX.Y.Z)"
+            exit 1
+          fi
+          TAG="$RAW_TAG"
+          # Récupère les 5 derniers commits pour le changelog (fetch-depth: 0 requis)
+          CHANGELOG=$(git log --oneline -5 --pretty=format:'- %s (%h)' 2>/dev/null || echo '- (no changelog available)')
           BODY="## RuntipiOS — Ready-to-flash Raspberry Pi image
 
           ### Flashing
@@ -131,21 +140,41 @@ jobs:
 
           ### First boot
           - **WiFi hotspot**: connect to the \`TipiSetup\` network (no password)
-          - **Portal**: open \`http://tipisetup.local:8080\` or \`http://10.42.0.1:8080\`
+          - **Ethernet**: if connected via cable, access directly via \`http://tipisetup.local:8080\`
+          - **Portal**: open \`http://tipisetup.local:8080\` (Ethernet/WiFi) or \`http://10.42.0.1:8080\` (hotspot only)
           - Configure your network, SSH, hostname, then launch the installation
 
           ### Recommended hardware
-          - Raspberry Pi 4 or 5
+          - Raspberry Pi 4 ou 5
           - 16 GB SD card minimum (32 GB recommended)
+
+          ### Changes
+          ${CHANGELOG}
 
           **Commit**: ${{ github.sha }}"
 
+          # Vérifie qu'il y a bien des fichiers image à uploader
+          shopt -s nullglob
+          FILES=(/tmp/pi-gen/deploy/*.img*)
+          if [ ${#FILES[@]} -eq 0 ]; then
+            echo "ERROR: aucun fichier image trouvé dans /tmp/pi-gen/deploy/"
+            exit 1
+          fi
+
+          # Crée la release si elle n'existe pas encore (pointe sur le bon commit)
           gh release create "$TAG" \
-            --repo "${{ github.repository }}" \
-            --title "RuntipiOS Build ${{ github.run_number }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "${{ github.sha }}" \
+            --title "RuntipiOS $TAG" \
             --notes "$BODY" \
-            /tmp/pi-gen/deploy/*.img* 2>/dev/null || \
+            "${FILES[@]}" 2>/dev/null || true
+          # Si la release existait déjà (créée via GitHub), ajoute/remplace les assets
           gh release upload "$TAG" \
-            --repo "${{ github.repository }}" \
+            --repo "$GITHUB_REPOSITORY" \
             --clobber \
-            /tmp/pi-gen/deploy/*.img*
+            "${FILES[@]}"
+          # Met toujours à jour la description de la release avec le texte du workflow
+          gh release edit "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "RuntipiOS $TAG" \
+            --notes "$BODY"

@@ -28,6 +28,14 @@ from translations import get_t
 _ANSI_RE = re.compile(r'\x1b\[[0-9;]*[mGKHFABCDJr]')
 
 # ---------------------------------------------------------------------------
+# Patterns d'erreurs Docker fatales dans le flux de sortie du script Runtipi
+# ---------------------------------------------------------------------------
+_DOCKER_FATAL_RE = re.compile(
+    r'failed to copy|TLS handshake timeout|no space left|pull access denied',
+    re.IGNORECASE,
+)
+
+# ---------------------------------------------------------------------------
 # Traductions — initialisées dans main() après lecture de la config
 # ---------------------------------------------------------------------------
 T: dict = {}
@@ -327,6 +335,18 @@ def connect_wifi(wifi_ssid: str, wifi_password: str):
         _write_wifi_error(wifi_ssid, msg)
 
 
+def _runtipi_service_running() -> bool:
+    """Vérifie que Runtipi tourne via Docker (pas de service systemd dédié)."""
+    try:
+        result = subprocess.run(
+            ["docker", "ps", "--filter", "name=runtipi", "--format", "{{.Names}}"],
+            capture_output=True, text=True, timeout=15,
+        )
+        return bool(result.stdout.strip())
+    except Exception:
+        return False
+
+
 def install_runtipi(max_attempts: int = 3) -> bool:
     step(T["runtipi_step"])
     for attempt in range(1, max_attempts + 1):
@@ -349,19 +369,38 @@ def install_runtipi(max_attempts: int = 3) -> bool:
             )
             curl.stdout.close()
 
+            docker_errors = []
             for line in iter(bash.stdout.readline, ""):
                 line = _ANSI_RE.sub("", line).rstrip()
                 if line:
                     out(line)
+                    if _DOCKER_FATAL_RE.search(line):
+                        docker_errors.append(line)
 
             bash.wait()
             curl.wait()
 
-            if bash.returncode == 0:
-                done(T["runtipi_done"])
-                return True
-            else:
+            if bash.returncode != 0:
                 err(T["runtipi_fail"].format(code=bash.returncode))
+                continue
+
+            # bash a retourné 0, mais vérifier que les containers tournent vraiment
+            # Runtipi peut mettre jusqu'à 3 minutes pour démarrer ses containers
+            out("Vérification du démarrage des containers Runtipi (jusqu'à 3 min)…")
+            for _ in range(18):  # 18 × 10s = 3 minutes max
+                time.sleep(10)
+                if _runtipi_service_running():
+                    break
+            if not _runtipi_service_running():
+                err("Runtipi installé mais service inactif — nouvelle tentative.")
+                continue
+
+            if docker_errors:
+                out(f"Avertissement : {len(docker_errors)} erreur(s) Docker ignorée(s) par le script d'installation.")
+
+            done(T["runtipi_done"])
+            return True
+
         except Exception as e:
             err(T["runtipi_err"].format(e=e))
 

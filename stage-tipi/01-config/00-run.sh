@@ -28,6 +28,10 @@ install -v -m 755 files/retry-runtipi.sh                  "${ROOTFS_DIR}/opt/tip
 # Ref : même approche que RaspAP — seule méthode fiable pour brcmfmac (RPi 4/5)
 install -v -m 600 files/hostapd.conf                      "${ROOTFS_DIR}/etc/hostapd/tipi-hostapd.conf"
 
+# ---- Désactiver la veille WiFi (power save) — permanent via NetworkManager ----
+install -v -d "${ROOTFS_DIR}/etc/NetworkManager/conf.d"
+printf '[connection]\nwifi.powersave = 2\n' > "${ROOTFS_DIR}/etc/NetworkManager/conf.d/wifi-powersave-off.conf"
+
 # ---- Marqueur de premier démarrage ----
 touch "${ROOTFS_DIR}/var/lib/tipi-setup/.not-configured"
 

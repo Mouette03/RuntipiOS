@@ -20,7 +20,7 @@ Once configured, it automatically installs **Runtipi**, a self-hosted app store 
 - **Automatic Runtipi installation** — Docker included, starts on every reboot
 - **mDNS support** — access via `tipisetup.local:8080` without typing an IP address
 - **Ethernet & WiFi** — works with both; WiFi hotspot as fallback
-- **Optional Cockpit** — web-based system management interface (port 9090), enable via checkbox during setup
+- **Optional Cockpit** — web-based system management interface (port 9090), enable via checkbox during setup. If enabled, Cockpit uses the SSH credentials configured during system installation.
 
 ### First Boot Flow
 
@@ -139,7 +139,7 @@ Une fois configuré, il installe automatiquement **Runtipi**, un store d'applica
 - **Installation automatique de Runtipi** — Docker inclus, démarre à chaque reboot
 - **Support mDNS** — accès via `tipisetup.local:8080` sans saisir d'adresse IP
 - **Ethernet & WiFi** — fonctionne avec les deux ; hotspot WiFi en solution de repli
-- **Cockpit optionnel** — interface web de gestion système (port 9090), activable via une case à cocher lors de la configuration
+- **Cockpit optionnel** — interface web de gestion système (port 9090), activable via une case à cocher lors de la configuration. Si Cockpit est activé, il utilise les identifiants SSH configurés pendant l'installation du système.
 
 ### Déroulement au premier démarrage
 

@@ -25,7 +25,7 @@ Once configured, it automatically installs **Runtipi**, a self-hosted app store 
 ### First Boot Flow
 
 ```
-Flash image → Power on → Connect to "TipiSetup" WiFi (no password)
+Flash image → Power on → Connect to "TipiSetup" WiFi (no password) or plug in Ethernet if the Pi is on your network
   → Open http://tipisetup.local:8080  (or http://10.42.0.1:8080)
   → Fill in the form → Click "Apply and install Runtipi"
   → Watch the live log stream in your browser
@@ -37,7 +37,7 @@ Flash image → Power on → Connect to "TipiSetup" WiFi (no password)
 **Installation order** (runs automatically after you click Apply):
 1. System configuration — hostname, timezone, locale, user, SSH
 2. Network — static IP and/or WiFi credentials
-3. `apt update && apt upgrade` — requires internet; runs after WiFi is connected
+3. `apt update && apt upgrade` — requires internet; runs after network connectivity is available
 4. Runtipi — Docker + Runtipi installer
 
 > **Note:** If the Runtipi installer fails during first boot (network hiccup, timeout), a systemd service (`tipi-runtipi-retry.service`) retries it automatically on the next reboot. The retry script (`retry-runtipi.sh`) runs once, then disables itself.
@@ -144,7 +144,7 @@ Une fois configuré, il installe automatiquement **Runtipi**, un store d'applica
 ### Déroulement au premier démarrage
 
 ```
-Flasher l'image → Démarrer → Se connecter au WiFi "TipiSetup" (sans mot de passe)
+Flasher l'image → Démarrer → Se connecter au WiFi "TipiSetup" (sans mot de passe) ou brancher l'Ethernet si le Pi est sur votre réseau
   → Ouvrir http://tipisetup.local:8080  (ou http://10.42.0.1:8080)
   → Remplir le formulaire → Cliquer "Appliquer et installer Runtipi"
   → Suivre les logs en direct dans le navigateur
@@ -156,7 +156,7 @@ Flasher l'image → Démarrer → Se connecter au WiFi "TipiSetup" (sans mot de 
 **Ordre d'installation** (s'exécute automatiquement après avoir cliqué sur Appliquer) :
 1. Configuration système — hostname, fuseau horaire, locale, utilisateur, SSH
 2. Réseau — IP statique et/ou identifiants WiFi
-3. `apt update && apt upgrade` — nécessite Internet ; s'exécute après la connexion WiFi
+3. `apt update && apt upgrade` — nécessite Internet ; s'exécute après la connectivité réseau
 4. Runtipi — installateur Docker + Runtipi
 
 > **Note :** Si l'installateur Runtipi échoue au premier démarrage (coupure réseau, timeout), un service systemd (`tipi-runtipi-retry.service`) le relance automatiquement au prochain démarrage. Le script de relance (`retry-runtipi.sh`) s'exécute une fois, puis se désactive.

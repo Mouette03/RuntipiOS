@@ -14,7 +14,7 @@ Once configured, it automatically installs **Runtipi**, a self-hosted app store 
 
 ### Features
 
-- **Zero-touch setup** — connect to the `TipiSetup` WiFi hotspot, open a browser, done
+- **Zero-touch setup** — connect to the `TipiSetup` WiFi hotspot or use Ethernet if the Pi is on your network, open a browser, done
 - **Web configuration portal** — hostname, SSH user/password, timezone, locale, static IP, WiFi
 - **Multilingual** — English, French, German, Spanish (auto-detected, switchable at any time)
 - **Automatic Runtipi installation** — Docker included, starts on every reboot
@@ -133,7 +133,7 @@ Une fois configuré, il installe automatiquement **Runtipi**, un store d'applica
 
 ### Fonctionnalités
 
-- **Configuration sans écran** — connectez-vous au hotspot WiFi `TipiSetup`, ouvrez un navigateur, c'est tout
+- **Configuration sans écran** — connectez-vous au hotspot WiFi `TipiSetup` ou utilisez Ethernet si le Pi est sur votre réseau, ouvrez un navigateur, c'est tout
 - **Portail de configuration web** — hostname, utilisateur SSH, mot de passe, fuseau horaire, locale, IP statique, WiFi
 - **Multilingue** — anglais, français, allemand, espagnol (changeable à tout moment)
 - **Installation automatique de Runtipi** — Docker inclus, démarre à chaque reboot

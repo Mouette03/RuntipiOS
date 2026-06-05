@@ -425,10 +425,16 @@ def get_final_ip() -> str | None:
 def configure_cockpit(enabled: bool):
     if enabled:
         step(T["cockpit_step"])
+        # Le socket et le service sont masqués au build — il faut d'abord
+        # lever le masque avant de pouvoir les activer.
+        subprocess.run(["systemctl", "unmask", "cockpit.socket", "cockpit.service"],
+                       check=False, capture_output=True)
         subprocess.run(["systemctl", "enable", "--now", "cockpit.socket"], check=False)
         done(T["cockpit_done"])
     else:
         subprocess.run(["systemctl", "disable", "--now", "cockpit.socket"],
+                       check=False, capture_output=True)
+        subprocess.run(["systemctl", "mask", "cockpit.socket", "cockpit.service"],
                        check=False, capture_output=True)
 
 

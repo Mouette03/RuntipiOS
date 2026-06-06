@@ -58,9 +58,7 @@ def ethernet_connected() -> bool:
             ["ip", "-4", "addr", "show", "eth0"],
             capture_output=True, text=True, timeout=5,
         )
-        return "inet " in result.stdout and "state UP" in subprocess.run(
-            ["ip", "link", "show", "eth0"], capture_output=True, text=True, timeout=5
-        ).stdout
+        return "inet " in result.stdout and "LOWER_UP" in result.stdout
     except Exception:
         return False
 

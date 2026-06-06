@@ -249,16 +249,22 @@ def configure_static_ip(static_ip: str, static_gw: str, static_dns: str):
 def system_update():
     step(T["update_step"])
     env = {**os.environ, "DEBIAN_FRONTEND": "noninteractive"}
-    run_cmd(["apt-get", "update", "-y"], env=env, check=False)
-    done(T["update_done"])
+    r = run_cmd(["apt-get", "update", "-y"], env=env, check=False)
+    if r.returncode != 0:
+        err(T["update_warn"].format(rc=r.returncode))
+    else:
+        done(T["update_done"])
 
     step(T["upgrade_step"])
-    run_cmd([
+    r = run_cmd([
         "apt-get", "upgrade", "-y",
         "-o", "Dpkg::Options::=--force-confdef",
         "-o", "Dpkg::Options::=--force-confold",
     ], env=env, check=False)
-    done(T["upgrade_done"])
+    if r.returncode != 0:
+        err(T["upgrade_warn"].format(rc=r.returncode))
+    else:
+        done(T["upgrade_done"])
 
 
 def _write_wifi_error(ssid: str, msg: str):

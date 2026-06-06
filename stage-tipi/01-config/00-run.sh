@@ -60,10 +60,14 @@ systemctl enable tipi-runtipi-retry.service
 systemctl enable avahi-daemon.service
 
 # ---- Cockpit — interface web de gestion système (port 9090) ----
-# Installé ici, mais désactivé par défaut.
-# L'utilisateur peut l'activer via le portail de configuration (case à cocher).
+# Installé ici, mais masqué par défaut (disable seul ne suffit pas : les presets
+# APT/systemd peuvent le ré-activer au premier démarrage).
+# L'utilisateur peut l'activer via le portail de configuration (case à cocher) ;
+# setup.py fait un unmask + enable --now à ce moment-là.
 apt-get install -y cockpit
-systemctl disable cockpit.socket 2>/dev/null || true
+systemctl disable cockpit.socket  2>/dev/null || true
+systemctl mask    cockpit.socket  2>/dev/null || true
+systemctl mask    cockpit.service 2>/dev/null || true
 
 # ---- Activer SSH (désactivé par défaut sur Trixie) ----
 systemctl enable ssh.service

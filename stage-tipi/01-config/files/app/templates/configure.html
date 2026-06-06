@@ -174,6 +174,16 @@
     </button>
   </div>
 </form>
+
+<dialog id="confirm-dialog" style="border:none;border-radius:12px;padding:1.75rem;max-width:460px;width:92%;background:var(--card);color:var(--text);box-shadow:0 8px 40px rgba(0,0,0,0.5)">
+  <h3 id="dlg-title" style="margin:0 0 1rem;font-size:1rem;font-weight:700"></h3>
+  <table id="dlg-table" style="width:100%;border-collapse:collapse;font-size:0.85rem;margin-bottom:1rem;line-height:1.6"></table>
+  <p id="dlg-warning" style="font-size:0.78rem;color:var(--muted);margin:0 0 1.25rem;line-height:1.5;padding:0.65rem;background:rgba(239,68,68,0.08);border-radius:6px;border-left:3px solid #ef4444"></p>
+  <div style="display:flex;gap:0.75rem;justify-content:flex-end">
+    <button id="dlg-cancel"  style="padding:0.55rem 1.2rem;border-radius:var(--radius);border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;font-size:0.85rem"></button>
+    <button id="dlg-confirm" style="padding:0.55rem 1.2rem;border-radius:var(--radius);border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:0.85rem;font-weight:600"></button>
+  </div>
+</dialog>
 {% endblock %}
 
 {% block head %}
@@ -184,6 +194,20 @@
     scan_error:   {{ t('js_scan_error')|tojson }},
     launching:    {{ t('js_launching')|tojson }},
     pwd_mismatch: {{ t('js_pwd_mismatch')|tojson }},
+    dlg_title:    {{ t('dlg_title')|tojson }},
+    dlg_warning:  {{ t('dlg_warning')|tojson }},
+    dlg_cancel:   {{ t('dlg_btn_cancel')|tojson }},
+    dlg_confirm:  {{ t('dlg_btn_confirm')|tojson }},
+    dlg_hostname: {{ t('dlg_row_hostname')|tojson }},
+    dlg_user:     {{ t('dlg_row_user')|tojson }},
+    dlg_port:     {{ t('dlg_row_port')|tojson }},
+    dlg_ip:       {{ t('dlg_row_ip')|tojson }},
+    dlg_wifi:     {{ t('dlg_row_wifi')|tojson }},
+    dlg_cockpit:  {{ t('dlg_row_cockpit')|tojson }},
+    dlg_dhcp:     {{ t('dlg_dhcp')|tojson }},
+    dlg_ethernet: {{ t('dlg_ethernet')|tojson }},
+    dlg_enabled:  {{ t('dlg_enabled')|tojson }},
+    dlg_disabled: {{ t('dlg_disabled')|tojson }},
   };
 </script>
 <script>
@@ -251,12 +275,53 @@
       });
     }
 
-    // Désactiver le bouton à la soumission pour éviter le double-clic
-    document.querySelector("form").addEventListener("submit", () => {
+    // Modale de confirmation avant soumission
+    const form   = document.querySelector("form");
+    const dialog = document.getElementById("confirm-dialog");
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+
+      document.getElementById("dlg-title").textContent   = I18N.dlg_title;
+      document.getElementById("dlg-warning").textContent = I18N.dlg_warning;
+      document.getElementById("dlg-cancel").textContent  = I18N.dlg_cancel;
+      document.getElementById("dlg-confirm").textContent = "✅ " + I18N.dlg_confirm;
+
+      const hostname = form.querySelector("[name='hostname']").value.trim()  || "runtipios";
+      const username = form.querySelector("[name='username']").value.trim();
+      const sshPort  = form.querySelector("[name='ssh_port']").value.trim()  || "22";
+      const staticIp = form.querySelector("[name='static_ip']").value.trim();
+      const wifiSsid = form.querySelector("[name='wifi_ssid']").value.trim();
+      const cockpit  = form.querySelector("[name='cockpit_enabled']")?.checked;
+
+      const rows = [
+        [I18N.dlg_hostname, hostname],
+        [I18N.dlg_user,     username],
+        [I18N.dlg_port,     sshPort],
+        [I18N.dlg_ip,       staticIp || I18N.dlg_dhcp],
+        [I18N.dlg_wifi,     wifiSsid || I18N.dlg_ethernet],
+        [I18N.dlg_cockpit,  cockpit ? I18N.dlg_enabled : I18N.dlg_disabled],
+      ];
+
+      document.getElementById("dlg-table").innerHTML = rows.map(([k, v]) =>
+        `<tr>
+          <td style="padding:0.35rem 1rem 0.35rem 0;color:var(--muted);white-space:nowrap">${k}</td>
+          <td style="padding:0.35rem 0;font-weight:600">${v}</td>
+        </tr>`
+      ).join("");
+
+      dialog.showModal();
+    });
+
+    document.getElementById("dlg-cancel").addEventListener("click", () => dialog.close());
+    document.getElementById("dlg-confirm").addEventListener("click", () => {
+      dialog.close();
       const btn = document.getElementById("submit-btn");
       btn.disabled = true;
       btn.textContent = I18N.launching;
+      form.submit();
     });
+    dialog.addEventListener("click", (e) => { if (e.target === dialog) dialog.close(); });
 
     // Validation des mots de passe côté client
     const pwd2 = document.getElementById("pwd2");

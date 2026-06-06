@@ -250,15 +250,21 @@ def apply_config():
     ssh_key = request.form.get("ssh_key", "").strip()
     disable_pass = request.form.get("disable_password_auth") == "on"
 
-    # IP statique — validation basique
+    # IP statique — validation stricte (structure + octets ≤ 255)
     static_ip = request.form.get("static_ip", "").strip()
     static_gw = request.form.get("static_gw", "").strip()
     static_dns = request.form.get("static_dns", "8.8.8.8").strip()
-    ip_pattern = re.compile(r"^(\d{1,3}\.){3}\d{1,3}(/\d{1,2})?$")
-    if static_ip and not ip_pattern.match(static_ip):
-        static_ip = ""
-    if static_gw and not ip_pattern.match(static_gw):
-        static_gw = ""
+
+    def _valid_ip(ip: str) -> bool:
+        pattern = re.compile(r"^(\d{1,3}\.){3}\d{1,3}(/\d{1,2})?$")
+        if not pattern.match(ip):
+            return False
+        return all(0 <= int(p) <= 255 for p in ip.split("/")[0].split("."))
+
+    if static_ip and not _valid_ip(static_ip):
+        return redirect(f"/configure?error={quote(T['err_static_ip_invalid'])}")
+    if static_gw and not _valid_ip(static_gw):
+        return redirect(f"/configure?error={quote(T['err_static_gw_invalid'])}")
 
     wifi_ssid = request.form.get("wifi_ssid", "").strip()
     wifi_password = request.form.get("wifi_password", "").strip()

@@ -353,6 +353,23 @@ def _runtipi_service_running() -> bool:
         return False
 
 
+def _wait_for_internet(max_wait: int = 60) -> bool:
+    step(T["internet_check"])
+    for i in range(max_wait):
+        r = subprocess.run(
+            ["getent", "hosts", "setup.runtipi.io"],
+            capture_output=True,
+        )
+        if r.returncode == 0:
+            done(T["internet_ok"])
+            return True
+        if i > 0 and i % 10 == 0:
+            out(f"{T['internet_wait'].format(s=i)}")
+        time.sleep(1)
+    err(T["internet_fail"])
+    return False
+
+
 def install_runtipi(max_attempts: int = 3) -> bool:
     step(T["runtipi_step"])
     for attempt in range(1, max_attempts + 1):
@@ -413,18 +430,21 @@ def install_runtipi(max_attempts: int = 3) -> bool:
     return False
 
 
-def get_final_ip() -> str | None:
-    for iface in ["eth0", "wlan0"]:
-        try:
-            r = subprocess.run(
-                ["ip", "-4", "addr", "show", iface],
-                capture_output=True, text=True,
-            )
-            m = re.search(r"inet\s+(\d+\.\d+\.\d+\.\d+)", r.stdout)
-            if m and not m.group(1).startswith("10.42."):
-                return m.group(1)
-        except Exception:
-            pass
+def get_final_ip(max_wait: int = 30) -> str | None:
+    _EXCLUDED = ("10.42.", "169.254.")
+    for _ in range(max_wait):
+        for iface in ["eth0", "wlan0"]:
+            try:
+                r = subprocess.run(
+                    ["ip", "-4", "addr", "show", iface],
+                    capture_output=True, text=True,
+                )
+                m = re.search(r"inet\s+(\d+\.\d+\.\d+\.\d+)", r.stdout)
+                if m and not m.group(1).startswith(_EXCLUDED):
+                    return m.group(1)
+            except Exception:
+                pass
+        time.sleep(1)
     return None
 
 
@@ -510,6 +530,15 @@ def main():
         step("⚠️ " + T["wifi_hotspot_warn"])
     connect_wifi(wifi_ssid, wifi_password)
     system_update()
+    if not _wait_for_internet():
+        try:
+            with open("/boot/firmware/tipi-install-failed.flag", "w") as f:
+                f.write("1")
+        except Exception:
+            pass
+        err(T["runtipi_retry_boot"].format(hostname=hostname))
+        done(T["config_done"])
+        return
     if not install_runtipi():
         try:
             with open("/boot/firmware/tipi-install-failed.flag", "w") as f:

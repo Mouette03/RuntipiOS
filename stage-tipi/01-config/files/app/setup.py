@@ -506,7 +506,7 @@ def main():
     ssh_port             = str(cfg.get("ssh_port", "22"))
     ssh_key              = cfg.get("ssh_key", "").strip()
     disable_password_auth = bool(cfg.get("disable_password_auth", False))
-    timezone             = cfg.get("timezone", "Europe/Paris")
+    timezone             = cfg.get("timezone", "UTC")
     locale               = cfg.get("locale", "fr_FR.UTF-8")
     static_ip            = cfg.get("static_ip", "")
     static_gw            = cfg.get("static_gw", "")

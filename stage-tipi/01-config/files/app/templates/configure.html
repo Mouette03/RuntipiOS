@@ -322,12 +322,20 @@
         [I18N.dlg_cockpit,  cockpit ? I18N.dlg_enabled : I18N.dlg_disabled],
       ];
 
-      document.getElementById("dlg-table").innerHTML = rows.map(([k, v]) =>
-        `<tr>
-          <td style="padding:0.35rem 1rem 0.35rem 0;color:var(--muted);white-space:nowrap">${k}</td>
-          <td style="padding:0.35rem 0;font-weight:600">${v}</td>
-        </tr>`
-      ).join("");
+      const tbody = document.getElementById("dlg-table");
+      tbody.innerHTML = "";
+      rows.forEach(([k, v]) => {
+        const tr = document.createElement("tr");
+        const td1 = document.createElement("td");
+        td1.style.cssText = "padding:0.35rem 1rem 0.35rem 0;color:var(--muted);white-space:nowrap";
+        td1.textContent = k;
+        const td2 = document.createElement("td");
+        td2.style.cssText = "padding:0.35rem 0;font-weight:600";
+        td2.textContent = v;
+        tr.appendChild(td1);
+        tr.appendChild(td2);
+        tbody.appendChild(tr);
+      });
 
       dialog.showModal();
     });

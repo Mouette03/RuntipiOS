@@ -255,15 +255,26 @@ def apply_config():
     static_gw = request.form.get("static_gw", "").strip()
     static_dns = request.form.get("static_dns", "8.8.8.8").strip()
 
+    def _valid_host_ip(ip: str) -> bool:
+        """Valide une IP pure sans CIDR (ex: gateway)."""
+        pattern = re.compile(r"^(\d{1,3}\.){3}\d{1,3}$")
+        if not pattern.match(ip):
+            return False
+        return all(0 <= int(p) <= 255 for p in ip.split("."))
+
     def _valid_ip(ip: str) -> bool:
+        """Valide une IP avec préfixe CIDR optionnel (0-32)."""
         pattern = re.compile(r"^(\d{1,3}\.){3}\d{1,3}(/\d{1,2})?$")
         if not pattern.match(ip):
             return False
-        return all(0 <= int(p) <= 255 for p in ip.split("/")[0].split("."))
+        parts = ip.split("/")
+        if len(parts) == 2 and not (0 <= int(parts[1]) <= 32):
+            return False
+        return all(0 <= int(p) <= 255 for p in parts[0].split("."))
 
     if static_ip and not _valid_ip(static_ip):
         return redirect(f"/configure?error={quote(T['err_static_ip_invalid'])}")
-    if static_gw and not _valid_ip(static_gw):
+    if static_gw and not _valid_host_ip(static_gw):
         return redirect(f"/configure?error={quote(T['err_static_gw_invalid'])}")
 
     wifi_ssid = request.form.get("wifi_ssid", "").strip()

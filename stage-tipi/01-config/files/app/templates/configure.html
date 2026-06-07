@@ -176,7 +176,7 @@
 </form>
 
 <dialog id="confirm-dialog" style="border:none;border-radius:12px;padding:1.75rem;max-width:460px;width:92%;background:var(--surface);color:var(--text);box-shadow:0 8px 40px rgba(0,0,0,0.5)">
-  <h3 id="dlg-title" style="margin:0 0 1rem;font-size:1rem;font-weight:700"></h3>
+  <h3 id="dlg-title" style="margin:0 0 1rem;font-size:1rem;font-weight:700;text-align:center"></h3>
   <table id="dlg-table" style="width:100%;border-collapse:collapse;font-size:0.85rem;margin-bottom:1rem;line-height:1.6"></table>
   <p id="dlg-warning" style="font-size:0.78rem;color:var(--muted);margin:0 0 1.25rem;line-height:1.5;padding:0.65rem;background:rgba(239,68,68,0.08);border-radius:6px;border-left:3px solid #ef4444"></p>
   <div style="display:flex;gap:0.75rem;justify-content:flex-end">
@@ -188,6 +188,9 @@
 
 {% block head %}
 <style>
+  #confirm-dialog {
+    margin: auto;
+  }
   #confirm-dialog::backdrop {
     background: rgba(0, 0, 0, 0.55);
     backdrop-filter: blur(4px);

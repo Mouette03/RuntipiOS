@@ -212,6 +212,8 @@
     dlg_user:     {{ t('dlg_row_user')|tojson }},
     dlg_port:     {{ t('dlg_row_port')|tojson }},
     dlg_ip:       {{ t('dlg_row_ip')|tojson }},
+    dlg_gw:       {{ t('dlg_row_gw')|tojson }},
+    dlg_dns:      {{ t('dlg_row_dns')|tojson }},
     dlg_wifi:     {{ t('dlg_row_wifi')|tojson }},
     dlg_cockpit:  {{ t('dlg_row_cockpit')|tojson }},
     dlg_dhcp:     {{ t('dlg_dhcp')|tojson }},
@@ -298,17 +300,23 @@
       document.getElementById("dlg-confirm").textContent = "✅ " + I18N.dlg_confirm;
 
       const hostname = form.querySelector("[name='hostname']").value.trim()  || "runtipios";
-      const username = form.querySelector("[name='username']").value.trim();
-      const sshPort  = form.querySelector("[name='ssh_port']").value.trim()  || "22";
-      const staticIp = form.querySelector("[name='static_ip']").value.trim();
-      const wifiSsid = form.querySelector("[name='wifi_ssid']").value.trim();
-      const cockpit  = form.querySelector("[name='cockpit_enabled']")?.checked;
+      const username  = form.querySelector("[name='username']").value.trim();
+      const sshPort   = form.querySelector("[name='ssh_port']").value.trim()  || "22";
+      const staticIp  = form.querySelector("[name='static_ip']").value.trim();
+      const staticGw  = form.querySelector("[name='static_gw']").value.trim();
+      const staticDns = form.querySelector("[name='static_dns']").value.trim();
+      const wifiSsid  = form.querySelector("[name='wifi_ssid']").value.trim();
+      const cockpit   = form.querySelector("[name='cockpit_enabled']")?.checked;
 
       const rows = [
         [I18N.dlg_hostname, hostname],
         [I18N.dlg_user,     username],
         [I18N.dlg_port,     sshPort],
         [I18N.dlg_ip,       staticIp || I18N.dlg_dhcp],
+        ...(staticIp ? [
+          [I18N.dlg_gw,  staticGw  || "—"],
+          [I18N.dlg_dns, staticDns || "8.8.8.8"],
+        ] : []),
         [I18N.dlg_wifi,     wifiSsid || I18N.dlg_ethernet],
         [I18N.dlg_cockpit,  cockpit ? I18N.dlg_enabled : I18N.dlg_disabled],
       ];

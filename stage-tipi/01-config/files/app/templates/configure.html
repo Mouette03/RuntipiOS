@@ -187,6 +187,12 @@
 {% endblock %}
 
 {% block head %}
+<style>
+  #confirm-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
+  }
+</style>
 <script>
   const I18N = {
     scanning:     {{ t('js_scanning')|tojson }},

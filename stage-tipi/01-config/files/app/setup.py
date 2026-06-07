@@ -532,7 +532,6 @@ def main():
         step("⚠️ " + T["wifi_hotspot_warn"])
     connect_wifi(wifi_ssid, wifi_password)
     configure_static_ip(static_ip, static_gw, static_dns)
-    system_update()
     if not _wait_for_internet():
         try:
             with open("/boot/firmware/tipi-install-failed.flag", "w") as f:
@@ -542,6 +541,7 @@ def main():
         err(T["runtipi_retry_boot"].format(hostname=hostname))
         done(T["config_done"])
         return
+    system_update()
     if not install_runtipi():
         try:
             with open("/boot/firmware/tipi-install-failed.flag", "w") as f:

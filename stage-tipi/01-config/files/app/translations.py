@@ -95,6 +95,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "err_ssh_port_invalid":  "SSH port must be a number between 1 and 65535",
         "err_static_ip_invalid": "Invalid static IP address (e.g. 192.168.1.50 or 192.168.1.50/24)",
         "err_static_gw_invalid": "Invalid gateway address",
+        "warn_wifi_password":   "⚠ An incorrect WiFi password will require reflashing the SD card.",
 
         # progress.html
         "page_progress_title":  "Installation in progress",
@@ -258,6 +259,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "err_ssh_port_invalid":  "Le port SSH doit être un nombre entre 1 et 65535",
         "err_static_ip_invalid": "Adresse IP statique invalide (ex : 192.168.1.50 ou 192.168.1.50/24)",
         "err_static_gw_invalid": "Adresse de passerelle invalide",
+        "warn_wifi_password":   "⚠ Un mot de passe WiFi incorrect nécessitera de reflasher la carte SD.",
 
         "page_progress_title":  "Installation en cours",
         "progress_h2":          "Installation en cours",
@@ -417,6 +419,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "err_ssh_port_invalid":  "SSH-Port muss eine Zahl zwischen 1 und 65535 sein",
         "err_static_ip_invalid": "Ungültige statische IP-Adresse (z.B. 192.168.1.50 oder 192.168.1.50/24)",
         "err_static_gw_invalid": "Ungültige Gateway-Adresse",
+        "warn_wifi_password":   "⚠ Ein falsches WLAN-Passwort erfordert ein erneutes Flashen der SD-Karte.",
 
         "page_progress_title":  "Installation läuft",
         "progress_h2":          "Installation läuft",
@@ -579,6 +582,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "err_ssh_port_invalid":  "El puerto SSH debe ser un número entre 1 y 65535",
         "err_static_ip_invalid": "Dirección IP estática inválida (ej: 192.168.1.50 o 192.168.1.50/24)",
         "err_static_gw_invalid": "Dirección de puerta de enlace inválida",
+        "warn_wifi_password":   "⚠ Una contraseña WiFi incorrecta requerirá volver a flashear la tarjeta SD.",
 
         "page_progress_title":  "Instalación en curso",
         "progress_h2":          "Instalación en curso",

@@ -277,7 +277,7 @@ def apply_config():
         "ssh_port":              ssh_port,
         "ssh_key":               ssh_key,
         "disable_password_auth": disable_pass and bool(ssh_key),
-        "timezone":              request.form.get("timezone", "Europe/Paris"),
+        "timezone":              request.form.get("timezone", "UTC"),
         "locale":                request.form.get("locale", "fr_FR.UTF-8"),
         "static_ip":             static_ip,
         "static_gw":             static_gw,

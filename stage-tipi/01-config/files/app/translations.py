@@ -47,6 +47,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         # configure.html — IP statique
         "summary_static_ip":    "Static IP (optional — recommended for a server)",
         "info_dhcp":            "Leave blank to use DHCP (your router assigns the IP automatically).",
+        "info_static_ip_priority": "If Ethernet is connected, it takes priority. Otherwise the static IP is applied to WiFi (configured below).",
         "label_static_ip":      "IP address (e.g. 192.168.1.50 or 192.168.1.50/24)",
         "label_gateway":        "Gateway (your router)",
         "label_dns":            "DNS server",
@@ -217,6 +218,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
 
         "summary_static_ip":    "IP statique (optionnel — recommandé pour un serveur)",
         "info_dhcp":            "Laissez vide pour utiliser le DHCP (votre box attribue l'IP automatiquement).",
+        "info_static_ip_priority": "Si l'Ethernet est connecté, il est prioritaire. Sinon l'IP statique est appliquée au WiFi (configuré ci-dessous).",
         "label_static_ip":      "Adresse IP (ex: 192.168.1.50 ou 192.168.1.50/24)",
         "label_gateway":        "Passerelle (votre box / routeur)",
         "label_dns":            "Serveur DNS",
@@ -379,6 +381,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
 
         "summary_static_ip":    "Statische IP (optional — empfohlen für Server)",
         "info_dhcp":            "Leer lassen für DHCP (IP wird automatisch vom Router vergeben).",
+        "info_static_ip_priority": "Wenn Ethernet verbunden ist, hat es Vorrang. Andernfalls wird die statische IP auf WLAN angewendet (unten konfiguriert).",
         "label_static_ip":      "IP-Adresse (z.B. 192.168.1.50 oder 192.168.1.50/24)",
         "label_gateway":        "Gateway (Ihr Router)",
         "label_dns":            "DNS-Server",
@@ -544,6 +547,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
 
         "summary_static_ip":    "IP estática (opcional — recomendado para servidor)",
         "info_dhcp":            "Deje en blanco para usar DHCP (su router asigna la IP automáticamente).",
+        "info_static_ip_priority": "Si Ethernet está conectado, tiene prioridad. De lo contrario, la IP estática se aplica al WiFi (configurado abajo).",
         "label_static_ip":      "Dirección IP (ej: 192.168.1.50 o 192.168.1.50/24)",
         "label_gateway":        "Puerta de enlace (su router)",
         "label_dns":            "Servidor DNS",

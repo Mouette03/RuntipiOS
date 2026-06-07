@@ -100,9 +100,10 @@
   <details>
     <summary>{{ t('summary_static_ip') }}</summary>
     <div class="inner">
-      <div class="alert alert-info" style="margin-bottom:1rem">
+      <div class="alert alert-info" style="margin-bottom:0.5rem">
         {{ t('info_dhcp') }}
       </div>
+      <p style="margin-bottom:1rem;font-size:0.76rem;color:var(--muted);padding:0.45rem 0.7rem;background:rgba(100,116,139,0.08);border-radius:6px;border-left:3px solid var(--muted);line-height:1.5">ℹ️ {{ t('info_static_ip_priority') }}</p>
       <div class="field">
         <label>{{ t('label_static_ip') }}</label>
         <input type="text" name="static_ip" placeholder="192.168.1.50"

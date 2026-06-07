@@ -225,10 +225,13 @@ def configure_static_ip(static_ip: str, static_gw: str, static_dns: str):
             capture_output=True, text=True,
         )
         eth_con = None
-        for line in result.stdout.strip().splitlines():
-            parts = line.split(":")
-            if len(parts) >= 2 and parts[1] == "eth0":
-                eth_con = parts[0]
+        for iface in ["eth0", "wlan0"]:
+            for line in result.stdout.strip().splitlines():
+                parts = line.split(":")
+                if len(parts) >= 2 and parts[1] == iface:
+                    eth_con = parts[0]
+                    break
+            if eth_con:
                 break
 
         if not eth_con:
@@ -525,10 +528,10 @@ def main():
     remove_build_user(username)
     add_ssh_key(username, ssh_key)
     configure_ssh(ssh_port, disable_password_auth, ssh_key)
-    configure_static_ip(static_ip, static_gw, static_dns)
     if wifi_ssid:
         step("⚠️ " + T["wifi_hotspot_warn"])
     connect_wifi(wifi_ssid, wifi_password)
+    configure_static_ip(static_ip, static_gw, static_dns)
     system_update()
     if not _wait_for_internet():
         try:

@@ -26,6 +26,7 @@ from translations import get_t
 # Nettoyage des codes ANSI (couleurs terminal) dans les sorties subprocess
 # ---------------------------------------------------------------------------
 _ANSI_RE = re.compile(r'\x1b\[[0-9;]*[mGKHFABCDJr]')
+_EXCLUDED_PREFIXES = ("10.42.", "169.254.")
 
 # ---------------------------------------------------------------------------
 # Patterns d'erreurs Docker fatales dans le flux de sortie du script Runtipi
@@ -225,10 +226,13 @@ def configure_static_ip(static_ip: str, static_gw: str, static_dns: str):
             capture_output=True, text=True,
         )
         eth_con = None
-        for line in result.stdout.strip().splitlines():
-            parts = line.split(":")
-            if len(parts) >= 2 and parts[1] == "eth0":
-                eth_con = parts[0]
+        for iface in ["eth0", "wlan0"]:
+            for line in result.stdout.strip().splitlines():
+                parts = line.split(":")
+                if len(parts) >= 2 and parts[1] == iface:
+                    eth_con = parts[0]
+                    break
+            if eth_con:
                 break
 
         if not eth_con:
@@ -249,16 +253,22 @@ def configure_static_ip(static_ip: str, static_gw: str, static_dns: str):
 def system_update():
     step(T["update_step"])
     env = {**os.environ, "DEBIAN_FRONTEND": "noninteractive"}
-    run_cmd(["apt-get", "update", "-y"], env=env, check=False)
-    done(T["update_done"])
+    r = run_cmd(["apt-get", "update", "-y"], env=env, check=False)
+    if r.returncode != 0:
+        err(T["update_warn"].format(rc=r.returncode))
+    else:
+        done(T["update_done"])
 
     step(T["upgrade_step"])
-    run_cmd([
+    r = run_cmd([
         "apt-get", "upgrade", "-y",
         "-o", "Dpkg::Options::=--force-confdef",
         "-o", "Dpkg::Options::=--force-confold",
     ], env=env, check=False)
-    done(T["upgrade_done"])
+    if r.returncode != 0:
+        err(T["upgrade_warn"].format(rc=r.returncode))
+    else:
+        done(T["upgrade_done"])
 
 
 def _write_wifi_error(ssid: str, msg: str):
@@ -347,6 +357,23 @@ def _runtipi_service_running() -> bool:
         return False
 
 
+def _wait_for_internet(max_wait: int = 60) -> bool:
+    step(T["internet_check"])
+    for i in range(max_wait):
+        r = subprocess.run(
+            ["getent", "hosts", "setup.runtipi.io"],
+            capture_output=True,
+        )
+        if r.returncode == 0:
+            done(T["internet_ok"])
+            return True
+        if i > 0 and i % 10 == 0:
+            out(f"{T['internet_wait'].format(s=i)}")
+        time.sleep(1)
+    err(T["internet_fail"])
+    return False
+
+
 def install_runtipi(max_attempts: int = 3) -> bool:
     step(T["runtipi_step"])
     for attempt in range(1, max_attempts + 1):
@@ -407,18 +434,20 @@ def install_runtipi(max_attempts: int = 3) -> bool:
     return False
 
 
-def get_final_ip() -> str | None:
-    for iface in ["eth0", "wlan0"]:
-        try:
-            r = subprocess.run(
-                ["ip", "-4", "addr", "show", iface],
-                capture_output=True, text=True,
-            )
-            m = re.search(r"inet\s+(\d+\.\d+\.\d+\.\d+)", r.stdout)
-            if m and not m.group(1).startswith("10.42."):
-                return m.group(1)
-        except Exception:
-            pass
+def get_final_ip(max_wait: int = 30) -> str | None:
+    for _ in range(max_wait):
+        for iface in ["eth0", "wlan0"]:
+            try:
+                r = subprocess.run(
+                    ["ip", "-4", "addr", "show", iface],
+                    capture_output=True, text=True,
+                )
+                m = re.search(r"inet\s+(\d+\.\d+\.\d+\.\d+)", r.stdout)
+                if m and not m.group(1).startswith(_EXCLUDED_PREFIXES):
+                    return m.group(1)
+            except Exception:
+                pass
+        time.sleep(1)
     return None
 
 
@@ -477,7 +506,7 @@ def main():
     ssh_port             = str(cfg.get("ssh_port", "22"))
     ssh_key              = cfg.get("ssh_key", "").strip()
     disable_password_auth = bool(cfg.get("disable_password_auth", False))
-    timezone             = cfg.get("timezone", "Europe/Paris")
+    timezone             = cfg.get("timezone", "UTC")
     locale               = cfg.get("locale", "fr_FR.UTF-8")
     static_ip            = cfg.get("static_ip", "")
     static_gw            = cfg.get("static_gw", "")
@@ -499,10 +528,19 @@ def main():
     remove_build_user(username)
     add_ssh_key(username, ssh_key)
     configure_ssh(ssh_port, disable_password_auth, ssh_key)
-    configure_static_ip(static_ip, static_gw, static_dns)
     if wifi_ssid:
         step("⚠️ " + T["wifi_hotspot_warn"])
     connect_wifi(wifi_ssid, wifi_password)
+    configure_static_ip(static_ip, static_gw, static_dns)
+    if not _wait_for_internet():
+        try:
+            with open("/boot/firmware/tipi-install-failed.flag", "w") as f:
+                f.write("1")
+        except Exception:
+            pass
+        err(T["runtipi_retry_boot"].format(hostname=hostname))
+        done(T["config_done"])
+        return
     system_update()
     if not install_runtipi():
         try:

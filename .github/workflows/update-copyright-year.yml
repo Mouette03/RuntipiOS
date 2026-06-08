@@ -26,4 +26,4 @@ jobs:
           git diff --quiet && echo "No change" && exit 0
           git add LICENSE
           git commit -m "chore: update copyright year to $(date +%Y)"
-          git push
+          git push origin HEAD:${{ github.ref_name }}

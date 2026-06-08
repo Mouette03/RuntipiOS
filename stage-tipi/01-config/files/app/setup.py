@@ -225,10 +225,13 @@ def configure_static_ip(static_ip: str, static_gw: str, static_dns: str):
             capture_output=True, text=True,
         )
         eth_con = None
-        for line in result.stdout.strip().splitlines():
-            parts = line.split(":")
-            if len(parts) >= 2 and parts[1] == "eth0":
-                eth_con = parts[0]
+        for iface in ["eth0", "wlan0"]:
+            for line in result.stdout.strip().splitlines():
+                parts = line.split(":")
+                if len(parts) >= 2 and parts[1] == iface:
+                    eth_con = parts[0]
+                    break
+            if eth_con:
                 break
 
         if not eth_con:
@@ -503,7 +506,7 @@ def main():
     ssh_port             = str(cfg.get("ssh_port", "22"))
     ssh_key              = cfg.get("ssh_key", "").strip()
     disable_password_auth = bool(cfg.get("disable_password_auth", False))
-    timezone             = cfg.get("timezone", "Europe/Paris")
+    timezone             = cfg.get("timezone", "UTC")
     locale               = cfg.get("locale", "fr_FR.UTF-8")
     static_ip            = cfg.get("static_ip", "")
     static_gw            = cfg.get("static_gw", "")
@@ -525,11 +528,10 @@ def main():
     remove_build_user(username)
     add_ssh_key(username, ssh_key)
     configure_ssh(ssh_port, disable_password_auth, ssh_key)
-    configure_static_ip(static_ip, static_gw, static_dns)
     if wifi_ssid:
         step("⚠️ " + T["wifi_hotspot_warn"])
     connect_wifi(wifi_ssid, wifi_password)
-    system_update()
+    configure_static_ip(static_ip, static_gw, static_dns)
     if not _wait_for_internet():
         try:
             with open("/boot/firmware/tipi-install-failed.flag", "w") as f:
@@ -539,6 +541,7 @@ def main():
         err(T["runtipi_retry_boot"].format(hostname=hostname))
         done(T["config_done"])
         return
+    system_update()
     if not install_runtipi():
         try:
             with open("/boot/firmware/tipi-install-failed.flag", "w") as f:

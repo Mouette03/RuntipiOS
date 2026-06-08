@@ -115,9 +115,15 @@ def get_current_ip() -> str | None:
 def get_timezones() -> list:
     try:
         from zoneinfo import available_timezones
-        return sorted(available_timezones())
+        _INVALID = {"localtime", "posixrules"}
+        return sorted(
+            tz for tz in available_timezones()
+            if "/" in tz
+            and not tz.startswith(("posix/", "right/"))
+            and tz not in _INVALID
+        )
     except Exception:
-        return ["Europe/Paris", "Europe/London", "America/New_York",
+        return ["UTC", "Europe/Paris", "Europe/London", "America/New_York",
                 "America/Los_Angeles", "Asia/Tokyo", "Asia/Shanghai"]
 
 # ---------------------------------------------------------------------------

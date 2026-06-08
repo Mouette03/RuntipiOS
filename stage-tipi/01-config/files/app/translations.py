@@ -55,7 +55,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         # configure.html — WiFi
         "h3_wifi":              "WiFi connection",
         "span_wifi_optional":   "(optional — if no Ethernet)",
-        "warn_wifi_hotspot":    "<strong>The hotspot will disconnect</strong> once the Raspberry Pi joins your WiFi network.<br>Reconnect to your WiFi, then open this address to follow the installation:",
+        "warn_wifi_hotspot":    "The network connection may change automatically during installation — the browser will attempt to reconnect. If the page remains unavailable, reconnect manually (WiFi or Ethernet) and open http://tipisetup.local:8080 or the Raspberry Pi's IP address.",
         "warn_wifi_mdns":       "(mDNS — Flask setup portal, active throughout the installation)",
         "warn_wifi_after_reboot": "After reboot, access Runtipi at:",
         "label_ssid":           "WiFi network name (SSID)",
@@ -75,7 +75,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
 
         # configure.html — confirmation dialog
         "dlg_title":        "Confirm configuration",
-        "dlg_warning":      "⚠️ The installation is irreversible. A wrong parameter would require re-flashing the SD card.",
+        "dlg_warning":      "The installation is irreversible. A wrong parameter would require re-flashing the SD card.",
         "dlg_btn_cancel":   "Modify",
         "dlg_btn_confirm":  "Confirm and start installation",
         "dlg_row_hostname": "Machine name",
@@ -98,7 +98,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "err_ssh_port_invalid":  "SSH port must be a number between 1 and 65535",
         "err_static_ip_invalid": "Invalid static IP address (e.g. 192.168.1.50 or 192.168.1.50/24)",
         "err_static_gw_invalid": "Invalid gateway address",
-        "warn_wifi_password":   "⚠ An incorrect WiFi password will require reflashing the SD card.",
+        "warn_wifi_password":   "An incorrect WiFi password will require reflashing the SD card.",
 
         # progress.html
         "page_progress_title":  "Installation in progress",
@@ -227,7 +227,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
 
         "h3_wifi":              "Connexion WiFi",
         "span_wifi_optional":   "(optionnel — si pas d'Ethernet)",
-        "warn_wifi_hotspot":    "<strong>La connexion au hotspot sera coupée</strong> dès que le Raspberry Pi rejoindra votre réseau WiFi.<br>Reconnectez-vous à votre WiFi, puis ouvrez cette adresse pour suivre l'installation :",
+        "warn_wifi_hotspot":    "La connexion réseau peut changer automatiquement pendant l'installation — le navigateur tentera de se reconnecter. Si la page reste inaccessible, reconnectez-vous manuellement (Wi-Fi ou Ethernet) puis ouvrez http://tipisetup.local:8080 ou l'adresse IP du Raspberry Pi.",
         "warn_wifi_mdns":       "(mDNS — portail Flask de configuration, actif tout au long de l'installation)",
         "warn_wifi_after_reboot": "Après redémarrage, accédez à Runtipi via :",
         "label_ssid":           "Nom du réseau WiFi (SSID)",
@@ -245,7 +245,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "js_pwd_mismatch":      "Les mots de passe ne correspondent pas",
 
         "dlg_title":        "Confirmer la configuration",
-        "dlg_warning":      "⚠️ L'installation est irréversible. Un paramètre incorrect nécessiterait de reflasher la carte SD.",
+        "dlg_warning":      "L'installation est irréversible. Un paramètre incorrect nécessiterait de reflasher la carte SD.",
         "dlg_btn_cancel":   "Modifier",
         "dlg_btn_confirm":  "Confirmer et lancer l'installation",
         "dlg_row_hostname": "Nom de la machine",
@@ -267,7 +267,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "err_ssh_port_invalid":  "Le port SSH doit être un nombre entre 1 et 65535",
         "err_static_ip_invalid": "Adresse IP statique invalide (ex : 192.168.1.50 ou 192.168.1.50/24)",
         "err_static_gw_invalid": "Adresse de passerelle invalide",
-        "warn_wifi_password":   "⚠ Un mot de passe WiFi incorrect nécessitera de reflasher la carte SD.",
+        "warn_wifi_password":   "Un mot de passe WiFi incorrect nécessitera de reflasher la carte SD.",
 
         "page_progress_title":  "Installation en cours",
         "progress_h2":          "Installation en cours",
@@ -392,7 +392,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
 
         "h3_wifi":              "WLAN-Verbindung",
         "span_wifi_optional":   "(optional — falls kein Ethernet)",
-        "warn_wifi_hotspot":    "<strong>Der Hotspot wird getrennt</strong>, sobald der Raspberry Pi Ihrem WLAN beitritt.<br>Verbinden Sie sich wieder mit Ihrem WLAN und öffnen Sie diese Adresse, um der Installation zu folgen:",
+        "warn_wifi_hotspot":    "Die Netzwerkverbindung kann sich während der Installation automatisch ändern — der Browser versucht, die Verbindung wiederherzustellen. Falls die Seite nicht erreichbar bleibt, verbinden Sie sich manuell (WLAN oder Ethernet) und öffnen Sie http://tipisetup.local:8080 oder die IP-Adresse des Raspberry Pi.",
         "warn_wifi_mdns":       "(mDNS — Flask-Einrichtungsportal, während der gesamten Installation aktiv)",
         "warn_wifi_after_reboot": "Nach dem Neustart erreichen Sie Runtipi unter:",
         "label_ssid":           "WLAN-Netzwerkname (SSID)",
@@ -410,7 +410,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "js_pwd_mismatch":      "Passwörter stimmen nicht überein",
 
         "dlg_title":        "Konfiguration bestätigen",
-        "dlg_warning":      "⚠️ Die Installation ist unwiderruflich. Ein falscher Parameter würde das Neuflashen der SD-Karte erfordern.",
+        "dlg_warning":      "Die Installation ist unwiderruflich. Ein falscher Parameter würde das Neuflashen der SD-Karte erfordern.",
         "dlg_btn_cancel":   "Bearbeiten",
         "dlg_btn_confirm":  "Bestätigen und Installation starten",
         "dlg_row_hostname": "Gerätename",
@@ -432,7 +432,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "err_ssh_port_invalid":  "SSH-Port muss eine Zahl zwischen 1 und 65535 sein",
         "err_static_ip_invalid": "Ungültige statische IP-Adresse (z.B. 192.168.1.50 oder 192.168.1.50/24)",
         "err_static_gw_invalid": "Ungültige Gateway-Adresse",
-        "warn_wifi_password":   "⚠ Ein falsches WLAN-Passwort erfordert ein erneutes Flashen der SD-Karte.",
+        "warn_wifi_password":   "Ein falsches WLAN-Passwort erfordert ein erneutes Flashen der SD-Karte.",
 
         "page_progress_title":  "Installation läuft",
         "progress_h2":          "Installation läuft",
@@ -560,7 +560,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
 
         "h3_wifi":              "Conexión WiFi",
         "span_wifi_optional":   "(opcional — si no hay Ethernet)",
-        "warn_wifi_hotspot":    "<strong>El hotspot se desconectará</strong> cuando el Raspberry Pi se una a su red WiFi.<br>Vuelva a conectarse a su WiFi y abra esta dirección para seguir la instalación:",
+        "warn_wifi_hotspot":    "La conexión de red puede cambiar automáticamente durante la instalación — el navegador intentará reconectarse. Si la página sigue inaccesible, reconéctese manualmente (WiFi o Ethernet) y abra http://tipisetup.local:8080 o la dirección IP del Raspberry Pi.",
         "warn_wifi_mdns":       "(mDNS — portal Flask de configuración, activo durante toda la instalación)",
         "warn_wifi_after_reboot": "Tras el reinicio, acceda a Runtipi en:",
         "label_ssid":           "Nombre de red WiFi (SSID)",
@@ -578,7 +578,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "js_pwd_mismatch":      "Las contraseñas no coinciden",
 
         "dlg_title":        "Confirmar configuración",
-        "dlg_warning":      "⚠️ La instalación es irreversible. Un parámetro incorrecto requeriría volver a flashear la tarjeta SD.",
+        "dlg_warning":      "La instalación es irreversible. Un parámetro incorrecto requeriría volver a flashear la tarjeta SD.",
         "dlg_btn_cancel":   "Modificar",
         "dlg_btn_confirm":  "Confirmar e iniciar instalación",
         "dlg_row_hostname": "Nombre del equipo",
@@ -600,7 +600,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "err_ssh_port_invalid":  "El puerto SSH debe ser un número entre 1 y 65535",
         "err_static_ip_invalid": "Dirección IP estática inválida (ej: 192.168.1.50 o 192.168.1.50/24)",
         "err_static_gw_invalid": "Dirección de puerta de enlace inválida",
-        "warn_wifi_password":   "⚠ Una contraseña WiFi incorrecta requerirá volver a flashear la tarjeta SD.",
+        "warn_wifi_password":   "Una contraseña WiFi incorrecta requerirá volver a flashear la tarjeta SD.",
 
         "page_progress_title":  "Instalación en curso",
         "progress_h2":          "Instalación en curso",
@@ -612,7 +612,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "reboot_msg":           "Reiniciando… Vuelva a conectarse en unos instantes mediante la dirección indicada.",
         "spinner_msg":          "Procesando…",
         "reconnect_static_ip":  "Reconectando mediante IP estática…",
-        "reconnecting":          "Reconectando…",,
+        "reconnecting":          "Reconectando…",
         "log_waiting":          "Esperando inicio…",
         "fallback_links":       "Acceda a Runtipi mediante la dirección IP de su Raspberry Pi",
 

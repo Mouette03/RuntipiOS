@@ -167,7 +167,7 @@
       <button type="button" onclick="toggle('wifi_password')"
         style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;line-height:0"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
     </div>
-    <p style="margin-top:0.45rem;font-size:0.76rem;color:var(--warn);padding:0.5rem 0.7rem;background:rgba(245,158,11,0.08);border-radius:6px;border-left:3px solid var(--warn);line-height:1.5">{{ t('warn_wifi_password') }}</p>
+    <p style="margin-top:0.45rem;font-size:0.76rem;color:var(--warn);padding:0.5rem 0.7rem;background:rgba(245,158,11,0.08);border-radius:6px;border-left:3px solid var(--warn);line-height:1.5">⚠ {{ t('warn_wifi_password') }}</p>
   </div>
 
   <div style="margin-top:1.5rem">
@@ -296,7 +296,7 @@
       e.preventDefault();
 
       document.getElementById("dlg-title").textContent   = I18N.dlg_title;
-      document.getElementById("dlg-warning").textContent = I18N.dlg_warning;
+      document.getElementById("dlg-warning").textContent = "⚠️ " + I18N.dlg_warning;
       document.getElementById("dlg-cancel").textContent  = I18N.dlg_cancel;
       document.getElementById("dlg-confirm").textContent = "✅ " + I18N.dlg_confirm;
 

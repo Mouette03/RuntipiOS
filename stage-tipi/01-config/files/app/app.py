@@ -114,17 +114,21 @@ def get_current_ip() -> str | None:
 
 def get_timezones() -> list:
     try:
-        from zoneinfo import available_timezones
-        _INVALID = {"localtime", "posixrules"}
-        return sorted(
-            tz for tz in available_timezones()
-            if "/" in tz
-            and not tz.startswith(("posix/", "right/"))
-            and tz not in _INVALID
+        result = subprocess.run(
+            ["timedatectl", "list-timezones"],
+            capture_output=True, text=True, timeout=10,
         )
+        zones = [z for z in result.stdout.strip().splitlines() if z]
+        if "UTC" in zones:
+            zones = ["UTC"] + [z for z in zones if z != "UTC"]
+        return zones if zones else _fallback_timezones()
     except Exception:
-        return ["UTC", "Europe/Paris", "Europe/London", "America/New_York",
-                "America/Los_Angeles", "Asia/Tokyo", "Asia/Shanghai"]
+        return _fallback_timezones()
+
+
+def _fallback_timezones() -> list:
+    return ["UTC", "Europe/Paris", "Europe/London", "America/New_York",
+            "America/Los_Angeles", "Asia/Tokyo", "Asia/Shanghai"]
 
 # ---------------------------------------------------------------------------
 # Portail captif — iOS / Android / Windows ouvrent le navigateur auto

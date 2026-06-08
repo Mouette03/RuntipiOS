@@ -521,6 +521,8 @@ def main():
         sys.exit(1)
 
     # --- Pipeline d'installation ---
+    if wifi_ssid:
+        step("⚠️ " + T["wifi_hotspot_warn"])
     configure_hostname(hostname)
     configure_timezone(timezone)
     configure_locale(locale)
@@ -528,8 +530,6 @@ def main():
     remove_build_user(username)
     add_ssh_key(username, ssh_key)
     configure_ssh(ssh_port, disable_password_auth, ssh_key)
-    if wifi_ssid:
-        step("⚠️ " + T["wifi_hotspot_warn"])
     connect_wifi(wifi_ssid, wifi_password)
     configure_static_ip(static_ip, static_gw, static_dns)
     if not _wait_for_internet():

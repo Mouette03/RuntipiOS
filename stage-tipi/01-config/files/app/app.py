@@ -324,7 +324,9 @@ def apply_config():
 def progress_page():
     if not _config:
         return redirect("/")
-    return render_template("progress.html", hostname=_config.get("hostname", "runtipios"))
+    static_ip_raw = _config.get("static_ip", "")
+    static_ip = static_ip_raw.split("/")[0] if static_ip_raw else ""
+    return render_template("progress.html", hostname=_config.get("hostname", "runtipios"), static_ip=static_ip)
 
 
 # ---------------------------------------------------------------------------

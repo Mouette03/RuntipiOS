@@ -110,6 +110,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "btn_rebooting":        "Rebooting…",
         "reboot_msg":           "Rebooting… Reconnect in a few moments via the address shown.",
         "spinner_msg":          "Processing…",
+        "reconnect_static_ip":  "Reconnecting via static IP…",
+        "reconnecting":          "Reconnecting…",
         "log_waiting":          "Waiting to start…",
         "fallback_links":       "Access Runtipi via the IP address of your Raspberry Pi",
 
@@ -276,6 +278,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "btn_rebooting":        "Redémarrage…",
         "reboot_msg":           "Redémarrage en cours… Reconnectez-vous dans quelques instants via l'adresse indiquée.",
         "spinner_msg":          "Traitement en cours…",
+        "reconnect_static_ip":  "Reconnexion via IP statique…",
+        "reconnecting":          "Reconnexion…",
         "log_waiting":          "En attente du démarrage…",
         "fallback_links":       "Accédez à Runtipi via l'adresse IP de votre Raspberry Pi",
 
@@ -439,6 +443,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "btn_rebooting":        "Neustart…",
         "reboot_msg":           "Neustart läuft… Verbinden Sie sich in wenigen Augenblicken über die angezeigte Adresse.",
         "spinner_msg":          "Verarbeitung…",
+        "reconnect_static_ip":  "Verbindung über statische IP wird hergestellt…",
+        "reconnecting":          "Verbindung wird wiederhergestellt…",
         "log_waiting":          "Warte auf Start…",
         "fallback_links":       "Zugriff auf Runtipi über die IP-Adresse des Raspberry Pi",
 
@@ -605,6 +611,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "btn_rebooting":        "Reiniciando…",
         "reboot_msg":           "Reiniciando… Vuelva a conectarse en unos instantes mediante la dirección indicada.",
         "spinner_msg":          "Procesando…",
+        "reconnect_static_ip":  "Reconectando mediante IP estática…",
+        "reconnecting":          "Reconectando…",,
         "log_waiting":          "Esperando inicio…",
         "fallback_links":       "Acceda a Runtipi mediante la dirección IP de su Raspberry Pi",
 

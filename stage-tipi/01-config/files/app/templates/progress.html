@@ -67,9 +67,12 @@
 <!-- Script après le DOM : les getElementById fonctionnent correctement -->
 <script>
   const I18N = {
-    fallback_links: {{ t('fallback_links')|tojson }},
-    btn_rebooting:  {{ t('btn_rebooting')|tojson }},
+    fallback_links:      {{ t('fallback_links')|tojson }},
+    btn_rebooting:       {{ t('btn_rebooting')|tojson }},
+    reconnecting:        {{ t('reconnecting')|tojson }},
+    reconnect_static_ip: {{ t('reconnect_static_ip')|tojson }},
   };
+  const STATIC_IP = {{ static_ip|tojson }};
 
   const STEPS = [
     "hostname", "timezone", "locale", "utilisateur", "ssh", "ip",
@@ -77,9 +80,10 @@
   ];
   let stepCount = 0;
   let nextIdx   = 0;
-  let pollTimer = null;
-  let failCount = 0;
-  let polling   = false;
+  let pollTimer   = null;
+  let failCount   = 0;
+  let polling     = false;
+  let baseUrl     = "";
 
   const logEl      = document.getElementById("log-container");
   const barEl      = document.getElementById("progress-bar");
@@ -130,7 +134,7 @@
     try {
       const ctrl = new AbortController();
       const t = setTimeout(() => ctrl.abort(), 4000);
-      const resp = await fetch(`/progress/log?from=${nextIdx}`, { signal: ctrl.signal });
+      const resp = await fetch(`${baseUrl}/progress/log?from=${nextIdx}`, { signal: ctrl.signal });
       clearTimeout(t);
       if (!resp.ok) { onFail(); return; }
 
@@ -164,7 +168,12 @@
 
   function onFail() {
     failCount++;
-    if (failCount === 5) spinner.innerHTML = '<span class="spin">⟳</span> Reconnexion…';
+    if (failCount === 5) spinner.innerHTML = `<span class="spin">⟳</span> ${I18N.reconnecting}`;
+    // Si IP statique configurée et connexion perdue, basculer vers la nouvelle IP
+    if (STATIC_IP && failCount === 8 && baseUrl === "") {
+      baseUrl = `http://${STATIC_IP}:8080`;
+      spinner.innerHTML = `<span class="spin">⟳</span> ${I18N.reconnect_static_ip}`;
+    }
   }
 
   async function doReboot() {

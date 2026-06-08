@@ -26,6 +26,7 @@ from translations import get_t
 # Nettoyage des codes ANSI (couleurs terminal) dans les sorties subprocess
 # ---------------------------------------------------------------------------
 _ANSI_RE = re.compile(r'\x1b\[[0-9;]*[mGKHFABCDJr]')
+_EXCLUDED_PREFIXES = ("10.42.", "169.254.")
 
 # ---------------------------------------------------------------------------
 # Patterns d'erreurs Docker fatales dans le flux de sortie du script Runtipi
@@ -434,7 +435,6 @@ def install_runtipi(max_attempts: int = 3) -> bool:
 
 
 def get_final_ip(max_wait: int = 30) -> str | None:
-    _EXCLUDED = ("10.42.", "169.254.")
     for _ in range(max_wait):
         for iface in ["eth0", "wlan0"]:
             try:
@@ -443,7 +443,7 @@ def get_final_ip(max_wait: int = 30) -> str | None:
                     capture_output=True, text=True,
                 )
                 m = re.search(r"inet\s+(\d+\.\d+\.\d+\.\d+)", r.stdout)
-                if m and not m.group(1).startswith(_EXCLUDED):
+                if m and not m.group(1).startswith(_EXCLUDED_PREFIXES):
                     return m.group(1)
             except Exception:
                 pass

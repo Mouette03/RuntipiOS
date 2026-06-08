@@ -118,7 +118,7 @@ def get_timezones() -> list:
             ["timedatectl", "list-timezones"],
             capture_output=True, text=True, timeout=10,
         )
-        zones = [z for z in result.stdout.strip().splitlines() if z]
+        zones = [z for z in result.stdout.strip().splitlines() if z and not z.startswith("Etc/")]
         if "UTC" in zones:
             zones = ["UTC"] + [z for z in zones if z != "UTC"]
         return zones if zones else _fallback_timezones()

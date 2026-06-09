@@ -390,6 +390,10 @@ def _run_setup_inner(step, done, err, out):
             continue
         if line.startswith("TIPI_IP:"):
             final_ip = line.split(":", 1)[1].strip()
+        elif line.startswith("TIPI_SWITCH_IP:"):
+            switch_ip = line.split(":", 1)[1].strip()
+            if switch_ip:
+                _progress_log.append({"level": "switch_ip", "ip": switch_ip, "msg": switch_ip})
         elif line.startswith("TIPI_STEP:"):
             step(line.split(":", 1)[1].strip())
         elif line.startswith("TIPI_DONE:"):

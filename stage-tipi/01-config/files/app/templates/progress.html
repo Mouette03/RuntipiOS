@@ -83,7 +83,6 @@
   let pollTimer   = null;
   let failCount   = 0;
   let polling     = false;
-  let baseUrl     = window.location.origin;
 
   const logEl      = document.getElementById("log-container");
   const barEl      = document.getElementById("progress-bar");
@@ -104,6 +103,12 @@
   function updateProgress() {
     const pct = Math.min(95, Math.round((stepCount / (STEPS.length + 1)) * 100));
     barEl.style.width = pct + "%";
+  }
+
+  function redirectToProgress(origin) {
+    if (!origin || window.location.origin === origin) return false;
+    window.location.replace(`${origin}/progress`);
+    return true;
   }
 
   function handleFinal(data) {
@@ -134,7 +139,7 @@
     try {
       const ctrl = new AbortController();
       const t = setTimeout(() => ctrl.abort(), 4000);
-      const resp = await fetch(`${baseUrl}/progress/log?from=${nextIdx}`, { signal: ctrl.signal });
+      const resp = await fetch(`/progress/log?from=${nextIdx}`, { signal: ctrl.signal });
       clearTimeout(t);
       if (!resp.ok) { onFail(); return; }
 
@@ -170,11 +175,11 @@
     failCount++;
     if (failCount === 5) spinner.innerHTML = `<span class="spin">⟳</span> ${I18N.reconnecting}`;
     if (failCount === 8) {
+      const targetOrigin = STATIC_IP ? `http://${STATIC_IP}:8080` : "http://tipisetup.local:8080";
+      if (redirectToProgress(targetOrigin)) return;
       if (STATIC_IP) {
-        baseUrl = `http://${STATIC_IP}:8080`;
         spinner.innerHTML = `<span class="spin">⟳</span> ${I18N.reconnect_static_ip}`;
       } else {
-        baseUrl = "http://tipisetup.local:8080";  // force re-résolution mDNS
         spinner.innerHTML = `<span class="spin">⟳</span> ${I18N.reconnecting}`;
       }
       failCount = 0;  // repart de zéro sur la nouvelle URL
@@ -186,7 +191,7 @@
     const msg = document.getElementById("reboot-msg");
     btn.disabled = true;
     btn.textContent = "⏳ " + I18N.btn_rebooting;
-    try { await fetch(`${baseUrl}/reboot`, { method: "POST" }); } catch (_) {}
+    try { await fetch("/reboot", { method: "POST" }); } catch (_) {}
     btn.style.display = "none";
     msg.style.display = "";
   }

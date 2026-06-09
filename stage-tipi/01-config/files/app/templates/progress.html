@@ -83,7 +83,7 @@
   let pollTimer   = null;
   let failCount   = 0;
   let polling     = false;
-  let baseUrl     = "";
+  let baseUrl     = window.location.origin;
 
   const logEl      = document.getElementById("log-container");
   const barEl      = document.getElementById("progress-bar");
@@ -169,10 +169,15 @@
   function onFail() {
     failCount++;
     if (failCount === 5) spinner.innerHTML = `<span class="spin">⟳</span> ${I18N.reconnecting}`;
-    // Si IP statique configurée et connexion perdue, basculer vers la nouvelle IP
-    if (STATIC_IP && failCount === 8 && baseUrl === "") {
-      baseUrl = `http://${STATIC_IP}:8080`;
-      spinner.innerHTML = `<span class="spin">⟳</span> ${I18N.reconnect_static_ip}`;
+    if (failCount === 8) {
+      if (STATIC_IP) {
+        baseUrl = `http://${STATIC_IP}:8080`;
+        spinner.innerHTML = `<span class="spin">⟳</span> ${I18N.reconnect_static_ip}`;
+      } else {
+        baseUrl = "http://tipisetup.local:8080";  // force re-résolution mDNS
+        spinner.innerHTML = `<span class="spin">⟳</span> ${I18N.reconnecting}`;
+      }
+      failCount = 0;  // repart de zéro sur la nouvelle URL
     }
   }
 
@@ -181,7 +186,7 @@
     const msg = document.getElementById("reboot-msg");
     btn.disabled = true;
     btn.textContent = "⏳ " + I18N.btn_rebooting;
-    try { await fetch("/reboot", { method: "POST" }); } catch (_) {}
+    try { await fetch(`${baseUrl}/reboot`, { method: "POST" }); } catch (_) {}
     btn.style.display = "none";
     msg.style.display = "";
   }

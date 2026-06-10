@@ -56,4 +56,4 @@ jobs:
           git diff --quiet && echo "No change" && exit 0
           git add NOTICES.md
           git commit -m "chore: update Python license notices"
-          git push origin HEAD:${{ github.ref_name }}
+          git push origin HEAD:main

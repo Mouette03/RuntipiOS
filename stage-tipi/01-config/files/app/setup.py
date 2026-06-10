@@ -413,17 +413,17 @@ def install_runtipi(max_attempts: int = 3) -> bool:
 
             # bash a retourné 0, mais vérifier que les containers tournent vraiment
             # Runtipi peut mettre jusqu'à 3 minutes pour démarrer ses containers
-            out("Vérification du démarrage des containers Runtipi (jusqu'à 3 min)…")
+            out(T["runtipi_check_start"])
             for _ in range(18):  # 18 × 10s = 3 minutes max
                 time.sleep(10)
                 if _runtipi_service_running():
                     break
             if not _runtipi_service_running():
-                err("Runtipi installé mais service inactif — nouvelle tentative.")
+                err(T["runtipi_inactive"])
                 continue
 
             if docker_errors:
-                out(f"Avertissement : {len(docker_errors)} erreur(s) Docker ignorée(s) par le script d'installation.")
+                out(T["runtipi_docker_warn"].format(n=len(docker_errors)))
 
             done(T["runtipi_done"])
             return True

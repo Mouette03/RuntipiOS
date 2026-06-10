@@ -67,9 +67,12 @@
 <!-- Script après le DOM : les getElementById fonctionnent correctement -->
 <script>
   const I18N = {
-    fallback_links: {{ t('fallback_links')|tojson }},
-    btn_rebooting:  {{ t('btn_rebooting')|tojson }},
+    fallback_links:      {{ t('fallback_links')|tojson }},
+    btn_rebooting:       {{ t('btn_rebooting')|tojson }},
+    reconnecting:        {{ t('reconnecting')|tojson }},
+    reconnect_static_ip: {{ t('reconnect_static_ip')|tojson }},
   };
+  const STATIC_IP = {{ static_ip|tojson }};
 
   const STEPS = [
     "hostname", "timezone", "locale", "utilisateur", "ssh", "ip",
@@ -77,9 +80,9 @@
   ];
   let stepCount = 0;
   let nextIdx   = 0;
-  let pollTimer = null;
-  let failCount = 0;
-  let polling   = false;
+  let pollTimer   = null;
+  let failCount   = 0;
+  let polling     = false;
 
   const logEl      = document.getElementById("log-container");
   const barEl      = document.getElementById("progress-bar");
@@ -100,6 +103,12 @@
   function updateProgress() {
     const pct = Math.min(95, Math.round((stepCount / (STEPS.length + 1)) * 100));
     barEl.style.width = pct + "%";
+  }
+
+  function redirectToProgress(origin) {
+    if (!origin || window.location.origin === origin) return false;
+    window.location.replace(`${origin}/progress`);
+    return true;
   }
 
   function handleFinal(data) {
@@ -164,7 +173,17 @@
 
   function onFail() {
     failCount++;
-    if (failCount === 5) spinner.innerHTML = '<span class="spin">⟳</span> Reconnexion…';
+    if (failCount === 5) spinner.innerHTML = `<span class="spin">⟳</span> ${I18N.reconnecting}`;
+    if (failCount === 8) {
+      const targetOrigin = STATIC_IP ? `http://${STATIC_IP}:8080` : "http://tipisetup.local:8080";
+      if (redirectToProgress(targetOrigin)) return;
+      if (STATIC_IP) {
+        spinner.innerHTML = `<span class="spin">⟳</span> ${I18N.reconnect_static_ip}`;
+      } else {
+        spinner.innerHTML = `<span class="spin">⟳</span> ${I18N.reconnecting}`;
+      }
+      failCount = 0;  // repart de zéro sur la nouvelle URL
+    }
   }
 
   async function doReboot() {

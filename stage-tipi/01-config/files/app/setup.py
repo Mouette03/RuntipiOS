@@ -413,17 +413,17 @@ def install_runtipi(max_attempts: int = 3) -> bool:
 
             # bash a retourné 0, mais vérifier que les containers tournent vraiment
             # Runtipi peut mettre jusqu'à 3 minutes pour démarrer ses containers
-            out("Vérification du démarrage des containers Runtipi (jusqu'à 3 min)…")
+            out(T["runtipi_check_start"])
             for _ in range(18):  # 18 × 10s = 3 minutes max
                 time.sleep(10)
                 if _runtipi_service_running():
                     break
             if not _runtipi_service_running():
-                err("Runtipi installé mais service inactif — nouvelle tentative.")
+                err(T["runtipi_inactive"])
                 continue
 
             if docker_errors:
-                out(f"Avertissement : {len(docker_errors)} erreur(s) Docker ignorée(s) par le script d'installation.")
+                out(T["runtipi_docker_warn"].format(n=len(docker_errors)))
 
             done(T["runtipi_done"])
             return True
@@ -521,6 +521,8 @@ def main():
         sys.exit(1)
 
     # --- Pipeline d'installation ---
+    if wifi_ssid:
+        step("⚠️ " + T["wifi_hotspot_warn"])
     configure_hostname(hostname)
     configure_timezone(timezone)
     configure_locale(locale)
@@ -528,8 +530,6 @@ def main():
     remove_build_user(username)
     add_ssh_key(username, ssh_key)
     configure_ssh(ssh_port, disable_password_auth, ssh_key)
-    if wifi_ssid:
-        step("⚠️ " + T["wifi_hotspot_warn"])
     connect_wifi(wifi_ssid, wifi_password)
     configure_static_ip(static_ip, static_gw, static_dns)
     if not _wait_for_internet():

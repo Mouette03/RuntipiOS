@@ -324,7 +324,12 @@ def apply_config():
 def progress_page():
     if not _config:
         return redirect("/")
-    return render_template("progress.html", hostname=_config.get("hostname", "runtipios"))
+    # Après un changement d'hôte (mDNS/IP), la session peut être nouvelle.
+    # On restaure la langue choisie lors de la soumission de la config.
+    session["lang"] = _config.get("lang", DEFAULT_LANG)
+    static_ip_raw = _config.get("static_ip", "")
+    static_ip = static_ip_raw.split("/")[0] if static_ip_raw else ""
+    return render_template("progress.html", hostname=_config.get("hostname", "runtipios"), static_ip=static_ip)
 
 
 # ---------------------------------------------------------------------------

@@ -244,8 +244,6 @@ def configure_static_ip(static_ip: str, static_gw: str, static_dns: str):
         subprocess.run(["nmcli", "con", "mod", eth_con, "ipv4.gateway", static_gw], check=True)
         subprocess.run(["nmcli", "con", "mod", eth_con, "ipv4.dns", static_dns], check=True)
         subprocess.run(["nmcli", "con", "mod", eth_con, "ipv4.method", "manual"], check=True)
-        # Signaler au portail web la future IP avant le rebond réseau.
-        print(f"TIPI_SWITCH_IP:{static_ip.split('/', 1)[0]}", flush=True)
         subprocess.run(["nmcli", "con", "up", eth_con], check=True)
         done(T["staticip_done"].format(static_ip=static_ip))
     except Exception as e:

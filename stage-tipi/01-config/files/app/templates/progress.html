@@ -73,7 +73,6 @@
     reconnect_static_ip: {{ t('reconnect_static_ip')|tojson }},
   };
   const STATIC_IP = {{ static_ip|tojson }};
-  const MDNS_ORIGIN = "http://tipisetup.local:8080";
 
   const STEPS = [
     "hostname", "timezone", "locale", "utilisateur", "ssh", "ip",
@@ -84,8 +83,6 @@
   let pollTimer   = null;
   let failCount   = 0;
   let polling     = false;
-  let switching   = false;
-  let hintedStaticIp = STATIC_IP;
 
   const logEl      = document.getElementById("log-container");
   const barEl      = document.getElementById("progress-bar");
@@ -108,51 +105,10 @@
     barEl.style.width = pct + "%";
   }
 
-  function redirectToProgress(origin, forceReload = false) {
-    if (!origin) return false;
-    const target = `${origin}/progress`;
-    if (window.location.origin === origin && !forceReload) return false;
-    const bust = forceReload ? `${target}?ts=${Date.now()}` : target;
-    window.location.replace(bust);
+  function redirectToProgress(origin) {
+    if (!origin || window.location.origin === origin) return false;
+    window.location.replace(`${origin}/progress`);
     return true;
-  }
-
-  async function canReach(origin, timeoutMs = 1500) {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), timeoutMs);
-    try {
-      await fetch(`${origin}/progress`, {
-        mode: "no-cors",
-        cache: "no-store",
-        signal: ctrl.signal,
-      });
-      return true;
-    } catch (_) {
-      return false;
-    } finally {
-      clearTimeout(t);
-    }
-  }
-
-  async function switchConnectionPath() {
-    if (switching) return;
-    switching = true;
-
-    // Hybride: tenter d'abord tipisetup.local, puis fallback IP statique si indisponible.
-    const mdnsOk = await canReach(MDNS_ORIGIN, 1500);
-    if (mdnsOk) {
-      redirectToProgress(MDNS_ORIGIN, true);
-      return;
-    }
-
-    if (hintedStaticIp) {
-      const staticOrigin = `http://${hintedStaticIp}:8080`;
-      redirectToProgress(staticOrigin, true);
-      return;
-    }
-
-    // DHCP sans IP statique: forcer un reload mDNS même origin pour casser le cache navigateur.
-    redirectToProgress(MDNS_ORIGIN, true);
   }
 
   function handleFinal(data) {
@@ -197,12 +153,6 @@
 
       for (const entry of data.entries) {
         nextIdx++;
-        if (entry.level === "switch_ip") {
-          if (entry.ip) hintedStaticIp = entry.ip;
-          spinner.innerHTML = `<span class="spin">⟳</span> ${I18N.reconnect_static_ip}`;
-          switchConnectionPath();
-          continue;
-        }
         if (entry.level === "final") {
           appendLog(entry.msg, "final");
           handleFinal(entry);
@@ -223,9 +173,16 @@
 
   function onFail() {
     failCount++;
-    if (failCount === 3) {
-      spinner.innerHTML = `<span class="spin">⟳</span> ${hintedStaticIp ? I18N.reconnect_static_ip : I18N.reconnecting}`;
-      switchConnectionPath();
+    if (failCount === 5) spinner.innerHTML = `<span class="spin">⟳</span> ${I18N.reconnecting}`;
+    if (failCount === 8) {
+      const targetOrigin = STATIC_IP ? `http://${STATIC_IP}:8080` : "http://tipisetup.local:8080";
+      if (redirectToProgress(targetOrigin)) return;
+      if (STATIC_IP) {
+        spinner.innerHTML = `<span class="spin">⟳</span> ${I18N.reconnect_static_ip}`;
+      } else {
+        spinner.innerHTML = `<span class="spin">⟳</span> ${I18N.reconnecting}`;
+      }
+      failCount = 0;  // repart de zéro sur la nouvelle URL
     }
   }
 

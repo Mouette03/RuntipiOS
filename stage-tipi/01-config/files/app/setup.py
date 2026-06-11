@@ -376,8 +376,6 @@ def _wait_for_internet(max_wait: int = 60) -> bool:
 
 def install_runtipi(max_attempts: int = 3) -> bool:
     step(T["runtipi_step"])
-    # Runtipi s'installe dans /opt (convention Linux pour les logiciels tiers système,
-    # cohérent avec le script Proxmox officiel qui utilise /opt/runtipi).
     for attempt in range(1, max_attempts + 1):
         if attempt > 1:
             out(T["runtipi_retry"].format(attempt=attempt, total=max_attempts))
@@ -395,7 +393,7 @@ def install_runtipi(max_attempts: int = 3) -> bool:
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
-                cwd="/opt",
+                cwd="/opt",  # convention Linux pour les logiciels tiers (cohérent avec le script Proxmox officiel)
             )
             curl.stdout.close()
 

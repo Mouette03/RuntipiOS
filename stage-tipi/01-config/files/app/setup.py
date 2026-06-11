@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 RuntipiOS — Script d'installation système
 Lancé par app.py via subprocess. Toutes les sorties sont capturées et
@@ -376,6 +376,9 @@ def _wait_for_internet(max_wait: int = 60) -> bool:
 
 def install_runtipi(max_attempts: int = 3) -> bool:
     step(T["runtipi_step"])
+    # Runtipi s'installe dans /opt (convention Linux pour les logiciels tiers système,
+    # cohérent avec le script Proxmox officiel qui utilise /opt/runtipi).
+    os.makedirs("/opt", exist_ok=True)
     for attempt in range(1, max_attempts + 1):
         if attempt > 1:
             out(T["runtipi_retry"].format(attempt=attempt, total=max_attempts))
@@ -393,6 +396,7 @@ def install_runtipi(max_attempts: int = 3) -> bool:
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
+                cwd="/opt",
             )
             curl.stdout.close()
 

@@ -378,7 +378,6 @@ def install_runtipi(max_attempts: int = 3) -> bool:
     step(T["runtipi_step"])
     # Runtipi s'installe dans /opt (convention Linux pour les logiciels tiers système,
     # cohérent avec le script Proxmox officiel qui utilise /opt/runtipi).
-    os.makedirs("/opt", exist_ok=True)
     for attempt in range(1, max_attempts + 1):
         if attempt > 1:
             out(T["runtipi_retry"].format(attempt=attempt, total=max_attempts))

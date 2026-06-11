@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 RuntipiOS — Script d'installation système
 Lancé par app.py via subprocess. Toutes les sorties sont capturées et
@@ -393,6 +393,7 @@ def install_runtipi(max_attempts: int = 3) -> bool:
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
+                cwd="/opt",  # convention Linux pour les logiciels tiers (cohérent avec le script Proxmox officiel)
             )
             curl.stdout.close()
 

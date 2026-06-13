@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 RuntipiOS — Portail de configuration (premier démarrage)
 Tourne sur le port 8080, accessible via :
@@ -9,6 +9,7 @@ Tourne sur le port 8080, accessible via :
 import json
 import os
 import re
+import shutil
 import subprocess
 import threading
 import time
@@ -446,6 +447,8 @@ def reboot():
     """Redémarre le Pi après un court délai (laisse la réponse partir)."""
     def _do_reboot():
         time.sleep(2)
+        # Nettoyage du portail de configuration (plus nécessaire après installation)
+        shutil.rmtree("/opt/tipi-setup", ignore_errors=True)
         subprocess.run(["systemctl", "reboot"], check=False)
     threading.Thread(target=_do_reboot, daemon=True).start()
     return jsonify({"ok": True})

@@ -1,4 +1,4 @@
-﻿# RuntipiOS
+# RuntipiOS
 
 > A custom Raspberry Pi OS image (Trixie Lite 64-bit) with a first-boot web configuration portal and automatic [Runtipi](https://runtipi.io) installation — no keyboard, no monitor, no hassle.
 
@@ -29,7 +29,7 @@ Flash image → Power on → Connect to "TipiSetup" WiFi (no password) or plug i
   → Open http://tipisetup.local:8080  (or http://10.42.0.1:8080)
   → Fill in the form → Click "Apply and install Runtipi"
   → Watch the live log stream in your browser
-  → Automatic reboot
+  → Reboot
   → Access Runtipi at http://<your-hostname>.local
     (e.g. http://runtipios.local or http://192.168.1.50)
 ```
@@ -148,7 +148,7 @@ Flasher l'image → Démarrer → Se connecter au WiFi "TipiSetup" (sans mot de 
   → Ouvrir http://tipisetup.local:8080  (ou http://10.42.0.1:8080)
   → Remplir le formulaire → Cliquer "Appliquer et installer Runtipi"
   → Suivre les logs en direct dans le navigateur
-  → Redémarrage automatique
+  → Redémarrage
   → Accéder à Runtipi sur http://<votre-hostname>.local
     (ex : http://runtipios.local ou http://192.168.1.50)
 ```

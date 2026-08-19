@@ -51,6 +51,10 @@ rm -f /lib/systemd/system/userconfig.service \
 systemctl disable hostapd.service 2>/dev/null || true
 systemctl mask hostapd.service    2>/dev/null || true
 
+# ---- Désactiver le service dnsmasq système (géré par start.sh pour le hotspot) ----
+systemctl disable dnsmasq.service 2>/dev/null || true
+systemctl mask dnsmasq.service    2>/dev/null || true
+
 # ---- Désactiver le service wpa_supplicant standalone (NM le gère en interne) ----
 systemctl disable wpa_supplicant.service 2>/dev/null || true
 

@@ -25,6 +25,40 @@ STATIC_DIR  = os.path.join(os.path.dirname(__file__), "static")
 app = Flask(__name__, template_folder=TEMPLATE_DIR, static_folder=STATIC_DIR)
 app.secret_key = os.urandom(32)
 
+# Mapping langue UI -> locale système
+LANG_TO_LOCALE = {
+    "fr": "fr_FR.UTF-8",
+    "de": "de_DE.UTF-8",
+    "es": "es_ES.UTF-8",
+    "en": "en_US.UTF-8",
+}
+
+
+def detect_browser_lang() -> str:
+    """Détecte la langue depuis l'en-tête Accept-Language.
+    Fallback sur DEFAULT_LANG si échec ou langue non supportée.
+    """
+    try:
+        accept = request.accept_languages
+        if not accept:
+            return DEFAULT_LANG
+        # 1. Correspondance exacte sur les codes supportés
+        best = accept.best_match(SUPPORTED_LANGS)
+        if best:
+            return best
+        # 2. Fallback sur sous-tag primaire (fr-FR -> fr)
+        candidates = []
+        for value, quality in accept:
+            primary = value.split("-")[0].lower()
+            if primary in SUPPORTED_LANGS:
+                candidates.append((quality, primary))
+        if candidates:
+            candidates.sort(key=lambda x: -x[0])
+            return candidates[0][1]
+    except Exception:
+        pass
+    return DEFAULT_LANG
+
 # ---------------------------------------------------------------------------
 # État global partagé (setup tourne dans un thread séparé)
 # ---------------------------------------------------------------------------
@@ -155,8 +189,11 @@ def handle_captive_portal():
 
 @app.context_processor
 def inject_i18n():
-    lang = session.get("lang", DEFAULT_LANG)
-    T    = get_t(lang)
+    lang = session.get("lang")
+    if not lang:
+        lang = detect_browser_lang()
+        session["lang"] = lang
+    T = get_t(lang)
     def t(key, **kw):
         val = T.get(key, key)
         return val.format(**kw) if kw else val
@@ -220,6 +257,8 @@ def wifi_connect():
 @app.route("/configure")
 def configure_page():
     error = request.args.get("error", "")
+    lang = session.get("lang") or detect_browser_lang()
+    default_locale = LANG_TO_LOCALE.get(lang, "en_US.UTF-8")
     return render_template(
         "configure.html",
         timezones=get_timezones(),
@@ -227,6 +266,7 @@ def configure_page():
         ethernet=ethernet_connected(),
         current_ip=get_current_ip(),
         error=error,
+        default_locale=default_locale,
     )
 
 

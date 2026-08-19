@@ -81,7 +81,7 @@
     <label>{{ t('label_locale') }}</label>
     <select name="locale">
       {% for code, label in locales %}
-        <option value="{{ code }}" {% if code == 'en_US.UTF-8' %}selected{% endif %}>{{ label }}</option>
+        <option value="{{ code }}" {% if code == default_locale %}selected{% endif %}>{{ label }}</option>
       {% endfor %}
     </select>
   </div>

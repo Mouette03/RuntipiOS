@@ -327,6 +327,15 @@ def apply_config():
         return redirect(f"/configure?error={quote(T['err_static_ip_invalid'])}")
     if static_gw and not _valid_host_ip(static_gw):
         return redirect(f"/configure?error={quote(T['err_static_gw_invalid'])}")
+    # Validation croisée : IP et GW doivent être fournis ensemble
+    if static_ip or static_gw:
+        if not static_ip:
+            return redirect(f"/configure?error={quote(T['err_static_ip_required'])}")
+        if not static_gw:
+            return redirect(f"/configure?error={quote(T['err_static_gw_required'])}")
+    # Validation DNS si fourni
+    if static_dns and not _valid_host_ip(static_dns):
+        return redirect(f"/configure?error={quote(T['err_static_dns_invalid'])}")
 
     wifi_ssid = request.form.get("wifi_ssid", "").strip()
     wifi_password = request.form.get("wifi_password", "").strip()

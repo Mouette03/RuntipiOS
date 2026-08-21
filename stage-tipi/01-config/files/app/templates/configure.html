@@ -12,16 +12,18 @@
 </p>
 
 {% if error %}
-  <div class="alert alert-error">{{ error }}</div>
+  <div class="alert alert-error" id="form-errors">{{ error }}</div>
+{% else %}
+  <div id="form-errors"></div>
 {% endif %}
 
-<form method="POST" action="/configure/apply" autocomplete="off">
+<form id="config-form" method="POST" action="/configure/apply" autocomplete="off" novalidate>
 
   <!-- Hostname -->
   <div class="field">
     <label>{{ t('label_hostname') }}</label>
-    <input type="text" name="hostname" value="runtipios" pattern="[a-zA-Z0-9\-]+" maxlength="63"
-           placeholder="runtipios" required>
+    <input type="text" name="hostname" value="runtipios" maxlength="63"
+           placeholder="runtipios">
     <small style="color:var(--muted);font-size:0.72rem">
       {{ t('hint_hostname')|safe }}
     </small>
@@ -30,15 +32,15 @@
   <!-- Utilisateur SSH -->
   <div class="field">
     <label>{{ t('label_username') }}</label>
-    <input type="text" name="username" pattern="[a-zA-Z0-9_\-]+" maxlength="32"
-           placeholder="pi" required autocomplete="off">
+    <input type="text" name="username" maxlength="32"
+           placeholder="pi" autocomplete="off">
   </div>
 
   <div class="field">
     <label>{{ t('label_password') }}</label>
     <div style="position:relative">
-      <input type="password" name="password" id="pwd1" minlength="8"
-             placeholder="{{ t('placeholder_password') }}" required autocomplete="new-password">
+      <input type="password" name="password" id="pwd1"
+             placeholder="{{ t('placeholder_password') }}" autocomplete="new-password">
       <button type="button" onclick="toggle('pwd1')"
         style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;line-height:0">
         <svg class="pwd-show" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -50,8 +52,8 @@
   <div class="field">
     <label>{{ t('label_confirm') }}</label>
     <div style="position:relative">
-      <input type="password" name="confirm_password" id="pwd2" minlength="8"
-             placeholder="{{ t('placeholder_confirm') }}" required autocomplete="new-password">
+      <input type="password" name="confirm_password" id="pwd2"
+             placeholder="{{ t('placeholder_confirm') }}" autocomplete="new-password">
       <button type="button" onclick="toggle('pwd2')"
         style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;line-height:0">
         <svg class="pwd-show" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -62,7 +64,7 @@
 
   <div class="field">
     <label>{{ t('label_ssh_port') }} <span style="color:var(--muted)">{{ t('label_ssh_port_def') }}</span></label>
-    <input type="number" name="ssh_port" value="22" min="1" max="65535" style="width:120px" required>
+    <input type="number" name="ssh_port" value="22" style="width:120px">
   </div>
 
   <!-- Clé SSH publique -->
@@ -112,18 +114,15 @@
       <p style="margin-bottom:1rem;font-size:0.76rem;color:var(--muted);padding:0.45rem 0.7rem;background:rgba(100,116,139,0.08);border-radius:6px;border-left:3px solid var(--muted);line-height:1.5">ℹ️ {{ t('info_static_ip_priority') }}</p>
       <div class="field">
         <label>{{ t('label_static_ip') }}</label>
-        <input type="text" name="static_ip" placeholder="192.168.1.50"
-               pattern="(\d{1,3}\.){3}\d{1,3}(/\d{1,2})?">
+        <input type="text" name="static_ip" placeholder="192.168.1.50">
       </div>
       <div class="field">
         <label>{{ t('label_gateway') }}</label>
-        <input type="text" name="static_gw" placeholder="192.168.1.1"
-               pattern="(\d{1,3}\.){3}\d{1,3}">
+        <input type="text" name="static_gw" placeholder="192.168.1.1">
       </div>
       <div class="field">
         <label>{{ t('label_dns') }}</label>
-        <input type="text" name="static_dns" value="8.8.8.8"
-               pattern="(\d{1,3}\.){3}\d{1,3}">
+        <input type="text" name="static_dns" value="8.8.8.8">
       </div>
     </div>
   </details>
@@ -165,7 +164,7 @@
     <small id="scan-status" style="color:var(--muted);font-size:0.72rem"></small>
   </div>
 
-  <div class="field">
+<div class="field">
     <label>{{ t('label_wifi_password') }}</label>
     <div style="position:relative">
       <input type="password" name="wifi_password" id="wifi_password"
@@ -176,6 +175,8 @@
         <svg class="pwd-hide" style="display:none" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
       </button>
     </div>
+    <p style="margin-top:0.45rem;font-size:0.76rem;color:var(--warn);padding:0.5rem 0.7rem;background:rgba(245,158,11,0.08);border-radius:6px;border-left:3px solid var(--warn);line-height:1.5">⚠️ {{ t('warn_wifi_password') }}</p>
+  </div>
     <p style="margin-top:0.45rem;font-size:0.76rem;color:var(--warn);padding:0.5rem 0.7rem;background:rgba(245,158,11,0.08);border-radius:6px;border-left:3px solid var(--warn);line-height:1.5">⚠️ {{ t('warn_wifi_password') }}</p>
   </div>
 
@@ -308,6 +309,7 @@
     // Modale de confirmation avant soumission
     const form   = document.querySelector("form");
     const dialog = document.getElementById("confirm-dialog");
+    const errorsDiv = document.getElementById("form-errors");
 
     form.addEventListener("submit", (e) => {
       e.preventDefault();
@@ -358,12 +360,42 @@
     });
 
     document.getElementById("dlg-cancel").addEventListener("click", () => dialog.close());
-    document.getElementById("dlg-confirm").addEventListener("click", () => {
+    document.getElementById("dlg-confirm").addEventListener("click", async () => {
       dialog.close();
       const btn = document.getElementById("submit-btn");
       btn.disabled = true;
       btn.textContent = I18N.launching;
-      form.submit();
+      errorsDiv.innerHTML = "";
+
+      const fd = new FormData(form);
+      try {
+        const res = await fetch("/configure/apply", {
+          method: "POST",
+          body: fd,
+          credentials: "include"
+        });
+
+        if (res.redirected) {
+          window.location.href = res.url;
+          return;
+        }
+
+        const html = await res.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, "text/html");
+        const err = doc.querySelector(".alert-error");
+        if (err) {
+          errorsDiv.innerHTML = err.outerHTML;
+          const firstInput = err.querySelector("input, select, textarea");
+          if (firstInput) firstInput.focus();
+        } else {
+          errorsDiv.innerHTML = '<div class="alert alert-error">Erreur inconnue</div>';
+        }
+      } catch (e) {
+        errorsDiv.innerHTML = '<div class="alert alert-error">Erreur de connexion au serveur</div>';
+      }
+      btn.disabled = false;
+      btn.textContent = "▶ " + {{ t('btn_submit')|tojson }};
     });
     dialog.addEventListener("click", (e) => { if (e.target === dialog) dialog.close(); });
 

@@ -274,6 +274,20 @@ def configure_page():
 def apply_config():
     global _config
 
+    # Détecter si requête AJAX (fetch)
+    is_ajax = (
+        request.headers.get("X-Requested-With") == "XMLHttpRequest" or
+        "fetch" in request.headers.get("Accept", "")
+    )
+
+    def err_response(msg: str):
+        """Retourne erreur selon le mode (AJAX ou standard)."""
+        if is_ajax:
+            return render_template_string(
+                '<div class="alert alert-error">{{ msg }}</div>', msg=msg
+            ), 400
+        return redirect(f"/configure?error={quote(msg)}")
+
     # Validation et nettoyage
     T = get_t(session.get("lang", DEFAULT_LANG))
 
@@ -284,11 +298,11 @@ def apply_config():
     ssh_port_raw = request.form.get("ssh_port", "22").strip()
 
     if not username:
-        return redirect(f"/configure?error={quote(T['err_username_required'])}")
+        return err_response(T['err_username_required'])
     if not password or len(password) < 8:
-        return redirect(f"/configure?error={quote(T['err_password_short'])}")
+        return err_response(T['err_password_short'])
     if password != confirm:
-        return redirect(f"/configure?error={quote(T['err_password_mismatch'])}")
+        return err_response(T['err_password_mismatch'])
 
     try:
         ssh_port_int = int(ssh_port_raw)
@@ -296,7 +310,7 @@ def apply_config():
             raise ValueError
         ssh_port = str(ssh_port_int)
     except ValueError:
-        return redirect(f"/configure?error={quote(T['err_ssh_port_invalid'])}")
+        return err_response(T['err_ssh_port_invalid'])
 
     ssh_key = request.form.get("ssh_key", "").strip()
     disable_pass = request.form.get("disable_password_auth") == "on"
@@ -324,18 +338,18 @@ def apply_config():
         return all(0 <= int(p) <= 255 for p in parts[0].split("."))
 
     if static_ip and not _valid_ip(static_ip):
-        return redirect(f"/configure?error={quote(T['err_static_ip_invalid'])}")
+        return err_response(T['err_static_ip_invalid'])
     if static_gw and not _valid_host_ip(static_gw):
-        return redirect(f"/configure?error={quote(T['err_static_gw_invalid'])}")
+        return err_response(T['err_static_gw_invalid'])
     # Validation croisée : IP et GW doivent être fournis ensemble
     if static_ip or static_gw:
         if not static_ip:
-            return redirect(f"/configure?error={quote(T['err_static_ip_required'])}")
+            return err_response(T['err_static_ip_required'])
         if not static_gw:
-            return redirect(f"/configure?error={quote(T['err_static_gw_required'])}")
+            return err_response(T['err_static_gw_required'])
     # Validation DNS si fourni
     if static_dns and not _valid_host_ip(static_dns):
-        return redirect(f"/configure?error={quote(T['err_static_dns_invalid'])}")
+        return err_response(T['err_static_dns_invalid'])
 
     wifi_ssid = request.form.get("wifi_ssid", "").strip()
     wifi_password = request.form.get("wifi_password", "").strip()

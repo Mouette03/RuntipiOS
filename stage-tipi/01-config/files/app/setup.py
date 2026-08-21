@@ -374,6 +374,25 @@ def _wait_for_internet(max_wait: int = 60) -> bool:
     return False
 
 
+def wait_for_time_sync(max_wait: int = 60) -> bool:
+    """Wait for systemd-timesyncd to synchronize the system clock.
+    Returns True if synchronized, False on timeout (non-blocking)."""
+    step(T["time_sync_step"])
+    for i in range(max_wait):
+        r = subprocess.run(
+            ["timedatectl", "show", "--property=NTPSynchronized"],
+            capture_output=True, text=True,
+        )
+        if "NTPSynchronized=yes" in r.stdout:
+            done(T["time_sync_done"])
+            return True
+        if i > 0 and i % 10 == 0:
+            out(f"{T['internet_wait'].format(s=i)}")
+        time.sleep(1)
+    err(T["time_sync_warn"])
+    return False
+
+
 def install_runtipi(max_attempts: int = 3) -> bool:
     step(T["runtipi_step"])
     for attempt in range(1, max_attempts + 1):
@@ -542,6 +561,7 @@ def main():
         err(T["runtipi_retry_boot"].format(hostname=hostname))
         done(T["config_done"])
         return
+    wait_for_time_sync()
     system_update()
     if not install_runtipi():
         try:

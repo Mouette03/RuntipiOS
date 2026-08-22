@@ -42,6 +42,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "placeholder_pubkey":   "Paste your public key here",
         "label_disable_pwd":    "Disable SSH password authentication (recommended if key provided)",
         "label_timezone":       "Timezone",
+        "toggle_password_visibility": "Toggle password visibility",
         "label_locale":         "Language / Locale",
 
         # configure.html — IP statique
@@ -182,6 +183,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "internet_wait":         "Waiting for internet… ({s}s)",
         "internet_fail":         "No internet connection after 60 s — aborting Runtipi installation",
         "time_sync_step":        "Synchronizing system clock (NTP)…",
+        "time_sync_wait":        "Waiting for NTP clock sync… ({s}s)",
         "time_sync_done":        "System clock synchronized",
         "time_sync_warn":        "Clock not synchronized (NTP timeout) — apt may fail with signature errors",
         "runtipi_step":         "Installing Runtipi (Docker included — please wait)…",
@@ -227,6 +229,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "placeholder_pubkey":   "Collez votre clé publique ici",
         "label_disable_pwd":    "Désactiver l'authentification par mot de passe SSH (recommandé si clé fournie)",
         "label_timezone":       "Fuseau horaire",
+        "toggle_password_visibility": "Afficher/masquer le mot de passe",
         "label_locale":         "Langue / Locale",
 
         "summary_static_ip":    "IP statique (optionnel — recommandé pour un serveur)",
@@ -358,6 +361,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "internet_wait":         "En attente d'internet… ({s}s)",
         "internet_fail":         "Pas de connexion internet après 60 s — installation de Runtipi annulée",
         "time_sync_step":        "Synchronisation de l'horloge système (NTP)…",
+        "time_sync_wait":        "En attente de la synchronisation NTP… ({s}s)",
         "time_sync_done":        "Horloge système synchronisée",
         "time_sync_warn":        "Horloge non synchronisée (timeout NTP) — apt peut échouer avec erreurs de signature",
         "runtipi_step":         "Installation de Runtipi (Docker inclus — patience)…",
@@ -403,6 +407,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "placeholder_pubkey":   "Öffentlichen Schlüssel hier einfügen",
         "label_disable_pwd":    "SSH-Passwortauthentifizierung deaktivieren (empfohlen bei vorhandenem Schlüssel)",
         "label_timezone":       "Zeitzone",
+        "toggle_password_visibility": "Passwort-Sichtbarkeit umschalten",
         "label_locale":         "Sprache / Locale",
 
         "summary_static_ip":    "Statische IP (optional — empfohlen für Server)",
@@ -534,6 +539,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "internet_wait":         "Warte auf Internet… ({s}s)",
         "internet_fail":         "Keine Internetverbindung nach 60 s — Runtipi-Installation abgebrochen",
         "time_sync_step":        "Systemzeit wird synchronisiert (NTP)…",
+        "time_sync_wait":        "Warte auf NTP-Zeitsynchronisation… ({s}s)",
         "time_sync_done":        "Systemzeit synchronisiert",
         "time_sync_warn":        "Zeit nicht synchronisiert (NTP-Timeout) — apt kann mit Signaturfehlern fehlschlagen",
         "runtipi_step":         "Runtipi wird installiert (Docker inklusive — bitte warten)…",
@@ -582,6 +588,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "placeholder_pubkey":   "Pegue su clave pública aquí",
         "label_disable_pwd":    "Desactivar autenticación SSH por contraseña (recomendado si hay clave)",
         "label_timezone":       "Zona horaria",
+        "toggle_password_visibility": "Alternar visibilidad de contraseña",
         "label_locale":         "Idioma / Locale",
 
         "summary_static_ip":    "IP estática (opcional — recomendado para servidor)",
@@ -713,6 +720,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "internet_wait":         "Esperando internet… ({s}s)",
         "internet_fail":         "Sin conexión a internet tras 60 s — instalación de Runtipi cancelada",
         "time_sync_step":        "Sincronizando reloj del sistema (NTP)…",
+        "time_sync_wait":        "Esperando sincronización NTP del reloj… ({s}s)",
         "time_sync_done":        "Reloj del sistema sincronizado",
         "time_sync_warn":        "Reloj no sincronizado (tiempo de espera NTP agotado) — apt puede fallar con errores de firma",
         "runtipi_step":         "Instalando Runtipi (Docker incluido — por favor espere)…",

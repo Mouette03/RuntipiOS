@@ -42,9 +42,10 @@
       <input type="password" name="password" id="pwd1"
              placeholder="{{ t('placeholder_password') }}" autocomplete="new-password">
       <button type="button" onclick="toggle('pwd1')"
-        style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;line-height:0">
-        <svg class="pwd-show" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-        <svg class="pwd-hide" style="display:none" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+        style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;line-height:0"
+        aria-label="{{ t('toggle_password_visibility') }}" aria-pressed="false">
+        <svg class="pwd-show" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        <svg class="pwd-hide" aria-hidden="true" style="display:none" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
       </button>
     </div>
   </div>
@@ -55,9 +56,10 @@
       <input type="password" name="confirm_password" id="pwd2"
              placeholder="{{ t('placeholder_confirm') }}" autocomplete="new-password">
       <button type="button" onclick="toggle('pwd2')"
-        style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;line-height:0">
-        <svg class="pwd-show" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-        <svg class="pwd-hide" style="display:none" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+        style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;line-height:0"
+        aria-label="{{ t('toggle_password_visibility') }}" aria-pressed="false">
+        <svg class="pwd-show" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        <svg class="pwd-hide" aria-hidden="true" style="display:none" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
       </button>
     </div>
   </div>
@@ -170,9 +172,10 @@
       <input type="password" name="wifi_password" id="wifi_password"
              placeholder="{{ t('placeholder_wifi_password') }}" autocomplete="off">
       <button type="button" onclick="toggle('wifi_password')"
-        style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;line-height:0">
-        <svg class="pwd-show" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-        <svg class="pwd-hide" style="display:none" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+        style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;line-height:0"
+        aria-label="{{ t('toggle_password_visibility') }}" aria-pressed="false">
+        <svg class="pwd-show" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        <svg class="pwd-hide" aria-hidden="true" style="display:none" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
       </button>
     </div>
     <p style="margin-top:0.45rem;font-size:0.76rem;color:var(--warn);padding:0.5rem 0.7rem;background:rgba(245,158,11,0.08);border-radius:6px;border-left:3px solid var(--warn);line-height:1.5">⚠️ {{ t('warn_wifi_password') }}</p>
@@ -231,6 +234,11 @@
     dlg_disabled: {{ t('dlg_disabled')|tojson }},
     server_connection_error: {{ t('js_server_connection_error')|tojson }},
     unknown_error_status:    {{ t('js_unknown_error_status')|tojson }},
+    err_static_ip_invalid:   {{ t('err_static_ip_invalid')|tojson }},
+    err_static_gw_invalid:   {{ t('err_static_gw_invalid')|tojson }},
+    err_static_ip_required:  {{ t('err_static_ip_required')|tojson }},
+    err_static_gw_required:  {{ t('err_static_gw_required')|tojson }},
+    err_static_dns_invalid:  {{ t('err_static_dns_invalid')|tojson }},
   };
 </script>
 <script>
@@ -244,6 +252,9 @@
     if (showIcon && hideIcon) {
       showIcon.style.display = isVisible ? '' : 'none';
       hideIcon.style.display = isVisible ? 'none' : '';
+    }
+    if (btn) {
+      btn.setAttribute('aria-pressed', isVisible ? 'false' : 'true');
     }
   }
 
@@ -311,8 +322,38 @@
     const dialog = document.getElementById("confirm-dialog");
     const errorsDiv = document.getElementById("form-errors");
 
+    // Validation IP/GW/DNS identique à celle du serveur — bloque la modale si invalide
+    function isValidHostIp(ip) {
+      if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(ip)) return false;
+      return ip.split(".").every(p => Number(p) >= 0 && Number(p) <= 255);
+    }
+    function isValidIp(ip) {
+      const m = ip.match(/^(\d{1,3}\.){3}\d{1,3}(\/(\d{1,2}))?$/);
+      if (!m) return false;
+      if (m[3] !== undefined && (Number(m[3]) < 0 || Number(m[3]) > 32)) return false;
+      return ip.split("/")[0].split(".").every(p => Number(p) >= 0 && Number(p) <= 255);
+    }
+    function showError(msg) {
+      errorsDiv.innerHTML = '<div class="alert alert-error">' + msg + '</div>';
+      errorsDiv.style.display = "block";
+      errorsDiv.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
     form.addEventListener("submit", (e) => {
       e.preventDefault();
+      errorsDiv.innerHTML = "";
+
+      const staticIpVal  = form.querySelector("[name='static_ip']").value.trim();
+      const staticGwVal  = form.querySelector("[name='static_gw']").value.trim();
+      const staticDnsVal = form.querySelector("[name='static_dns']").value.trim();
+
+      if (staticIpVal && !isValidIp(staticIpVal)) return showError(I18N.err_static_ip_invalid);
+      if (staticGwVal && !isValidHostIp(staticGwVal)) return showError(I18N.err_static_gw_invalid);
+      if (staticIpVal || staticGwVal) {
+        if (!staticIpVal) return showError(I18N.err_static_ip_required);
+        if (!staticGwVal) return showError(I18N.err_static_gw_required);
+      }
+      if (staticDnsVal && !isValidHostIp(staticDnsVal)) return showError(I18N.err_static_dns_invalid);
 
       document.getElementById("dlg-title").textContent   = I18N.dlg_title;
       document.getElementById("dlg-warning").textContent = "⚠️ " + I18N.dlg_warning;
@@ -389,17 +430,16 @@
         if (err) {
           errorsDiv.innerHTML = err.outerHTML;
           errorsDiv.style.display = "block";
+          errorsDiv.scrollIntoView({ behavior: "smooth", block: "center" });
           const firstInput = err.querySelector("input, select, textarea");
           if (firstInput) firstInput.focus();
         } else if (res.ok) {
           window.location.href = "/progress";
         } else {
-          errorsDiv.innerHTML = '<div class="alert alert-error">' + I18N.unknown_error_status.replace('{status}', res.status) + '</div>';
-          errorsDiv.style.display = "block";
+          showError(I18N.unknown_error_status.replace('{status}', res.status));
         }
       } catch (e) {
-        errorsDiv.innerHTML = '<div class="alert alert-error">' + I18N.server_connection_error + '</div>';
-        errorsDiv.style.display = "block";
+        showError(I18N.server_connection_error);
       }
       btn.disabled = false;
       btn.textContent = "▶ " + {{ t('btn_submit')|tojson }};

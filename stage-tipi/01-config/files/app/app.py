@@ -50,12 +50,12 @@ def detect_browser_lang() -> str:
         candidates = []
         for value, quality in accept:
             primary = value.split("-")[0].lower()
-            if primary in SUPPORTED_LANGS:
+            if quality > 0 and primary in SUPPORTED_LANGS:
                 candidates.append((quality, primary))
         if candidates:
             candidates.sort(key=lambda x: -x[0])
             return candidates[0][1]
-    except Exception:
+    except (RuntimeError, AttributeError):
         pass
     return DEFAULT_LANG
 
@@ -256,6 +256,7 @@ def wifi_connect():
 
 @app.route("/configure")
 def configure_page():
+    """Render the system configuration form with detected language locale."""
     error = request.args.get("error", "")
     lang = session.get("lang") or detect_browser_lang()
     default_locale = LANG_TO_LOCALE.get(lang, "en_US.UTF-8")
@@ -272,6 +273,7 @@ def configure_page():
 
 @app.route("/configure/apply", methods=["POST"])
 def apply_config():
+    """Process configuration form submission, validate input, start setup thread."""
     global _config
 
     # Détecter si requête AJAX (fetch)
@@ -282,6 +284,7 @@ def apply_config():
 
     def err_response(msg: str):
         """Retourne erreur selon le mode (AJAX ou standard)."""
+        print(f"[apply_config] validation error (is_ajax={is_ajax}): {msg}", flush=True)
         if is_ajax:
             return render_template_string(
                 '<div class="alert alert-error">{{ msg }}</div>', msg=msg
@@ -386,6 +389,7 @@ def apply_config():
 
 @app.route("/progress")
 def progress_page():
+    """Render the installation progress page with current configuration."""
     if not _config:
         return redirect("/")
     # Après un changement d'hôte (mDNS/IP), la session peut être nouvelle.
@@ -424,6 +428,7 @@ def _run_setup():
 
 
 def _run_setup_inner(step, done, err, out):
+    """Run the actual setup pipeline in a subprocess and stream progress."""
     T = get_t(_config.get("lang", DEFAULT_LANG))
 
     # Écriture de la config dans un fichier temporaire (évite les env vars avec mdp)

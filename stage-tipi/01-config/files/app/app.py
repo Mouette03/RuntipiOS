@@ -358,6 +358,9 @@ def apply_config():
     wifi_password = request.form.get("wifi_password", "").strip()
     cockpit_enabled = request.form.get("cockpit_enabled") == "1"
 
+    if len(wifi_ssid) > 32:
+        return err_response(T['err_ssid_too_long'])
+
     _config = {
         "hostname":              hostname,
         "username":              username,

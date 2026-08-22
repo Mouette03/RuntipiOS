@@ -239,6 +239,11 @@
     err_static_ip_required:  {{ t('err_static_ip_required')|tojson }},
     err_static_gw_required:  {{ t('err_static_gw_required')|tojson }},
     err_static_dns_invalid:  {{ t('err_static_dns_invalid')|tojson }},
+    err_username_required:   {{ t('err_username_required')|tojson }},
+    err_password_short:      {{ t('err_password_short')|tojson }},
+    err_password_mismatch:   {{ t('err_password_mismatch')|tojson }},
+    err_ssh_port_invalid:    {{ t('err_ssh_port_invalid')|tojson }},
+    err_ssid_too_long:       {{ t('err_ssid_too_long')|tojson }},
   };
 </script>
 <script>
@@ -343,9 +348,22 @@
       e.preventDefault();
       errorsDiv.innerHTML = "";
 
+      const usernameVal = form.querySelector("[name='username']").value.trim();
+      const passwordVal = form.querySelector("[name='password']").value;
+      const confirmVal  = form.querySelector("[name='confirm_password']").value;
+      const sshPortVal  = form.querySelector("[name='ssh_port']").value.trim();
+      const wifiSsidVal = form.querySelector("[name='wifi_ssid']").value.trim();
       const staticIpVal  = form.querySelector("[name='static_ip']").value.trim();
       const staticGwVal  = form.querySelector("[name='static_gw']").value.trim();
       const staticDnsVal = form.querySelector("[name='static_dns']").value.trim();
+
+      // Même nettoyage que le serveur (app.py: re.sub(r"[^a-zA-Z0-9_\-]", ...))
+      if (!usernameVal.replace(/[^a-zA-Z0-9_-]/g, "")) return showError(I18N.err_username_required);
+      if (!passwordVal || passwordVal.length < 8) return showError(I18N.err_password_short);
+      if (passwordVal !== confirmVal) return showError(I18N.err_password_mismatch);
+      const sshPortNum = Number(sshPortVal);
+      if (!sshPortVal || !Number.isInteger(sshPortNum) || sshPortNum < 1 || sshPortNum > 65535) return showError(I18N.err_ssh_port_invalid);
+      if (wifiSsidVal.length > 32) return showError(I18N.err_ssid_too_long);
 
       if (staticIpVal && !isValidIp(staticIpVal)) return showError(I18N.err_static_ip_invalid);
       if (staticGwVal && !isValidHostIp(staticGwVal)) return showError(I18N.err_static_gw_invalid);

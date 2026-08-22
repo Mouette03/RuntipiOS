@@ -104,6 +104,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "err_static_ip_required": "Static IP address required if gateway provided",
         "err_static_gw_required": "Gateway required if static IP provided",
         "err_static_dns_invalid": "Invalid DNS server address",
+        "err_ssid_too_long":     "WiFi network name (SSID) must be 32 characters or fewer",
         "warn_wifi_password":   "An incorrect WiFi password will require reflashing the SD card.",
 
         # progress.html
@@ -286,6 +287,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "err_static_ip_required": "Adresse IP statique requise si passerelle fournie",
         "err_static_gw_required": "Passerelle requise si IP statique fournie",
         "err_static_dns_invalid": "Adresse de serveur DNS invalide",
+        "err_ssid_too_long":     "Le nom du réseau WiFi (SSID) doit faire 32 caractères maximum",
         "warn_wifi_password":   "Un mot de passe WiFi incorrect nécessitera de reflasher la carte SD.",
 
         "page_progress_title":  "Installation en cours",
@@ -464,6 +466,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "err_static_ip_required": "Statische IP-Adresse erforderlich, wenn Gateway angegeben",
         "err_static_gw_required": "Gateway erforderlich, wenn statische IP angegeben",
         "err_static_dns_invalid": "Ungültige DNS-Server-Adresse",
+        "err_ssid_too_long":     "WLAN-Netzwerkname (SSID) darf maximal 32 Zeichen lang sein",
         "warn_wifi_password":   "Ein falsches WLAN-Passwort erfordert ein erneutes Flashen der SD-Karte.",
 
         "page_progress_title":  "Installation läuft",
@@ -645,6 +648,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "err_static_ip_required": "Dirección IP estática requerida si se proporciona puerta de enlace",
         "err_static_gw_required": "Puerta de enlace requerida si se proporciona IP estática",
         "err_static_dns_invalid": "Dirección de servidor DNS inválida",
+        "err_ssid_too_long":     "El nombre de red WiFi (SSID) debe tener 32 caracteres o menos",
         "warn_wifi_password":   "Una contraseña WiFi incorrecta requerirá volver a flashear la tarjeta SD.",
 
         "page_progress_title":  "Instalación en curso",

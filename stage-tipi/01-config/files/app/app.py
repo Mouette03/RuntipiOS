@@ -14,7 +14,7 @@ import subprocess
 import threading
 import time
 from urllib.parse import quote
-from flask import Flask, Response, jsonify, redirect, render_template, request, session
+from flask import Flask, Response, jsonify, redirect, render_template, render_template_string, request, session
 from translations import get_t, DEFAULT_LANG, SUPPORTED_LANGS, LANG_LABELS
 
 # ---------------------------------------------------------------------------

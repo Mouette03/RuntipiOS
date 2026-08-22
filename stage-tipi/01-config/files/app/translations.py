@@ -72,6 +72,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "js_scan_error":        "Scan error — enter the name manually.",
         "js_launching":         "Starting…",
         "js_pwd_mismatch":      "Passwords do not match",
+        "js_server_connection_error": "Server connection error",
+        "js_unknown_error_status":    "Unknown error (status: {status})",
 
         # configure.html — confirmation dialog
         "dlg_title":        "Confirm configuration",
@@ -252,6 +254,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "js_scan_error":        "Erreur lors du scan — saisissez le nom manuellement.",
         "js_launching":         "Lancement en cours…",
         "js_pwd_mismatch":      "Les mots de passe ne correspondent pas",
+        "js_server_connection_error": "Erreur de connexion au serveur",
+        "js_unknown_error_status":    "Erreur inconnue (status: {status})",
 
         "dlg_title":        "Confirmer la configuration",
         "dlg_warning":      "L'installation est irréversible. Un paramètre incorrect nécessiterait de reflasher la carte SD.",
@@ -426,6 +430,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "js_scan_error":        "Scan-Fehler — Namen manuell eingeben.",
         "js_launching":         "Wird gestartet…",
         "js_pwd_mismatch":      "Passwörter stimmen nicht überein",
+        "js_server_connection_error": "Serververbindungsfehler",
+        "js_unknown_error_status":    "Unbekannter Fehler (Status: {status})",
 
         "dlg_title":        "Konfiguration bestätigen",
         "dlg_warning":      "Die Installation ist unwiderruflich. Ein falscher Parameter würde das Neuflashen der SD-Karte erfordern.",
@@ -603,6 +609,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "js_scan_error":        "Error de escaneo — introduzca el nombre manualmente.",
         "js_launching":         "Iniciando…",
         "js_pwd_mismatch":      "Las contraseñas no coinciden",
+        "js_server_connection_error": "Error de conexión al servidor",
+        "js_unknown_error_status":    "Error desconocido (status: {status})",
 
         "dlg_title":        "Confirmar configuración",
         "dlg_warning":      "La instalación es irreversible. Un parámetro incorrecto requeriría volver a flashear la tarjeta SD.",

@@ -229,6 +229,8 @@
     dlg_ethernet: {{ t('dlg_ethernet')|tojson }},
     dlg_enabled:  {{ t('dlg_enabled')|tojson }},
     dlg_disabled: {{ t('dlg_disabled')|tojson }},
+    server_connection_error: {{ t('js_server_connection_error')|tojson }},
+    unknown_error_status:    {{ t('js_unknown_error_status')|tojson }},
   };
 </script>
 <script>
@@ -364,6 +366,7 @@
       btn.disabled = true;
       btn.textContent = I18N.launching;
       errorsDiv.innerHTML = "";
+      errorsDiv.style.display = "block";
 
       const fd = new FormData(form);
       try {
@@ -374,8 +377,8 @@
           headers: { "X-Requested-With": "XMLHttpRequest" }
         });
 
-        if (res.redirected) {
-          window.location.href = res.url;
+        if (res.redirected || res.status === 302 || res.status === 301) {
+          window.location.href = res.url || "/progress";
           return;
         }
 
@@ -385,13 +388,18 @@
         const err = doc.querySelector(".alert-error");
         if (err) {
           errorsDiv.innerHTML = err.outerHTML;
+          errorsDiv.style.display = "block";
           const firstInput = err.querySelector("input, select, textarea");
           if (firstInput) firstInput.focus();
+        } else if (res.ok) {
+          window.location.href = "/progress";
         } else {
-          errorsDiv.innerHTML = '<div class="alert alert-error">Erreur inconnue</div>';
+          errorsDiv.innerHTML = '<div class="alert alert-error">' + I18N.unknown_error_status.replace('{status}', res.status) + '</div>';
+          errorsDiv.style.display = "block";
         }
       } catch (e) {
-        errorsDiv.innerHTML = '<div class="alert alert-error">Erreur de connexion au serveur</div>';
+        errorsDiv.innerHTML = '<div class="alert alert-error">' + I18N.server_connection_error + '</div>';
+        errorsDiv.style.display = "block";
       }
       btn.disabled = false;
       btn.textContent = "▶ " + {{ t('btn_submit')|tojson }};

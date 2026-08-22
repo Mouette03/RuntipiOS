@@ -177,8 +177,6 @@
     </div>
     <p style="margin-top:0.45rem;font-size:0.76rem;color:var(--warn);padding:0.5rem 0.7rem;background:rgba(245,158,11,0.08);border-radius:6px;border-left:3px solid var(--warn);line-height:1.5">⚠️ {{ t('warn_wifi_password') }}</p>
   </div>
-    <p style="margin-top:0.45rem;font-size:0.76rem;color:var(--warn);padding:0.5rem 0.7rem;background:rgba(245,158,11,0.08);border-radius:6px;border-left:3px solid var(--warn);line-height:1.5">⚠️ {{ t('warn_wifi_password') }}</p>
-  </div>
 
   <div style="margin-top:1.5rem">
     <button type="submit" class="btn btn-primary btn-full" id="submit-btn">
@@ -372,7 +370,8 @@
         const res = await fetch("/configure/apply", {
           method: "POST",
           body: fd,
-          credentials: "include"
+          credentials: "include",
+          headers: { "X-Requested-With": "XMLHttpRequest" }
         });
 
         if (res.redirected) {

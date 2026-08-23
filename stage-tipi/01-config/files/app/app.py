@@ -14,7 +14,7 @@ import subprocess
 import threading
 import time
 from urllib.parse import quote
-from flask import Flask, Response, jsonify, redirect, render_template, request, session
+from flask import Flask, Response, jsonify, redirect, render_template, render_template_string, request, session
 from translations import get_t, DEFAULT_LANG, SUPPORTED_LANGS, LANG_LABELS
 
 # ---------------------------------------------------------------------------
@@ -50,12 +50,12 @@ def detect_browser_lang() -> str:
         candidates = []
         for value, quality in accept:
             primary = value.split("-")[0].lower()
-            if primary in SUPPORTED_LANGS:
+            if quality > 0 and primary in SUPPORTED_LANGS:
                 candidates.append((quality, primary))
         if candidates:
             candidates.sort(key=lambda x: -x[0])
             return candidates[0][1]
-    except Exception:
+    except (RuntimeError, AttributeError):
         pass
     return DEFAULT_LANG
 
@@ -256,6 +256,7 @@ def wifi_connect():
 
 @app.route("/configure")
 def configure_page():
+    """Render the system configuration form with detected language locale."""
     error = request.args.get("error", "")
     lang = session.get("lang") or detect_browser_lang()
     default_locale = LANG_TO_LOCALE.get(lang, "en_US.UTF-8")
@@ -272,7 +273,23 @@ def configure_page():
 
 @app.route("/configure/apply", methods=["POST"])
 def apply_config():
+    """Process configuration form submission, validate input, start setup thread."""
     global _config
+
+    # Détecter si requête AJAX (fetch)
+    is_ajax = (
+        request.headers.get("X-Requested-With") == "XMLHttpRequest" or
+        "fetch" in request.headers.get("Accept", "")
+    )
+
+    def err_response(msg: str):
+        """Retourne erreur selon le mode (AJAX ou standard)."""
+        print(f"[apply_config] validation error (is_ajax={is_ajax}): {msg}", flush=True)
+        if is_ajax:
+            return render_template_string(
+                '<div class="alert alert-error">{{ msg }}</div>', msg=msg
+            ), 400
+        return redirect(f"/configure?error={quote(msg)}")
 
     # Validation et nettoyage
     T = get_t(session.get("lang", DEFAULT_LANG))
@@ -284,11 +301,11 @@ def apply_config():
     ssh_port_raw = request.form.get("ssh_port", "22").strip()
 
     if not username:
-        return redirect(f"/configure?error={quote(T['err_username_required'])}")
+        return err_response(T['err_username_required'])
     if not password or len(password) < 8:
-        return redirect(f"/configure?error={quote(T['err_password_short'])}")
+        return err_response(T['err_password_short'])
     if password != confirm:
-        return redirect(f"/configure?error={quote(T['err_password_mismatch'])}")
+        return err_response(T['err_password_mismatch'])
 
     try:
         ssh_port_int = int(ssh_port_raw)
@@ -296,7 +313,7 @@ def apply_config():
             raise ValueError
         ssh_port = str(ssh_port_int)
     except ValueError:
-        return redirect(f"/configure?error={quote(T['err_ssh_port_invalid'])}")
+        return err_response(T['err_ssh_port_invalid'])
 
     ssh_key = request.form.get("ssh_key", "").strip()
     disable_pass = request.form.get("disable_password_auth") == "on"
@@ -324,13 +341,25 @@ def apply_config():
         return all(0 <= int(p) <= 255 for p in parts[0].split("."))
 
     if static_ip and not _valid_ip(static_ip):
-        return redirect(f"/configure?error={quote(T['err_static_ip_invalid'])}")
+        return err_response(T['err_static_ip_invalid'])
     if static_gw and not _valid_host_ip(static_gw):
-        return redirect(f"/configure?error={quote(T['err_static_gw_invalid'])}")
+        return err_response(T['err_static_gw_invalid'])
+    # Validation croisée : IP et GW doivent être fournis ensemble
+    if static_ip or static_gw:
+        if not static_ip:
+            return err_response(T['err_static_ip_required'])
+        if not static_gw:
+            return err_response(T['err_static_gw_required'])
+    # Validation DNS si fourni
+    if static_dns and not _valid_host_ip(static_dns):
+        return err_response(T['err_static_dns_invalid'])
 
     wifi_ssid = request.form.get("wifi_ssid", "").strip()
     wifi_password = request.form.get("wifi_password", "").strip()
     cockpit_enabled = request.form.get("cockpit_enabled") == "1"
+
+    if len(wifi_ssid) > 32:
+        return err_response(T['err_ssid_too_long'])
 
     _config = {
         "hostname":              hostname,
@@ -363,6 +392,7 @@ def apply_config():
 
 @app.route("/progress")
 def progress_page():
+    """Render the installation progress page with current configuration."""
     if not _config:
         return redirect("/")
     # Après un changement d'hôte (mDNS/IP), la session peut être nouvelle.
@@ -401,6 +431,7 @@ def _run_setup():
 
 
 def _run_setup_inner(step, done, err, out):
+    """Run the actual setup pipeline in a subprocess and stream progress."""
     T = get_t(_config.get("lang", DEFAULT_LANG))
 
     # Écriture de la config dans un fichier temporaire (évite les env vars avec mdp)

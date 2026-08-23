@@ -9,6 +9,7 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
+      color-scheme: dark;
       --bg:       #0f1117;
       --surface:  #1a1d27;
       --border:   #2a2d3e;
@@ -20,6 +21,29 @@
       --text:     #e2e8f0;
       --muted:    #64748b;
       --radius:   12px;
+    }
+
+    /* Scrollbar clair sur thème sombre */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--bg);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--muted);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    ::-webkit-scrollbar-corner {
+      background: var(--bg);
+    }
+    * {
+      scrollbar-color: var(--muted) var(--bg);
+      scrollbar-width: thin;
     }
 
     body {

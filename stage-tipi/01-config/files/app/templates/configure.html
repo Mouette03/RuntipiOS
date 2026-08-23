@@ -363,7 +363,7 @@
       if (passwordVal !== confirmVal) return showError(I18N.err_password_mismatch);
       const sshPortNum = Number(sshPortVal);
       if (!sshPortVal || !Number.isInteger(sshPortNum) || sshPortNum < 1 || sshPortNum > 65535) return showError(I18N.err_ssh_port_invalid);
-      if (wifiSsidVal.length > 32) return showError(I18N.err_ssid_too_long);
+      if (new TextEncoder().encode(wifiSsidVal).length > 32) return showError(I18N.err_ssid_too_long);
 
       if (staticIpVal && !isValidIp(staticIpVal)) return showError(I18N.err_static_ip_invalid);
       if (staticGwVal && !isValidHostIp(staticGwVal)) return showError(I18N.err_static_gw_invalid);

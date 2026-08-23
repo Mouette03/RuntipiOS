@@ -236,7 +236,7 @@ def wifi_connect():
     ssid = str(data.get("ssid", "")).strip()
     password = str(data.get("password", "")).strip()
 
-    if not ssid or len(ssid) > 32:
+    if not ssid or len(ssid.encode("utf-8")) > 32:
         return jsonify({"success": False, "error": "SSID invalide"})
 
     try:
@@ -358,7 +358,7 @@ def apply_config():
     wifi_password = request.form.get("wifi_password", "").strip()
     cockpit_enabled = request.form.get("cockpit_enabled") == "1"
 
-    if len(wifi_ssid) > 32:
+    if len(wifi_ssid.encode("utf-8")) > 32:
         return err_response(T['err_ssid_too_long'])
 
     _config = {

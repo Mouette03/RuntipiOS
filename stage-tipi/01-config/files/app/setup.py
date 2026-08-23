@@ -251,6 +251,7 @@ def configure_static_ip(static_ip: str, static_gw: str, static_dns: str):
 
 
 def system_update():
+    """Update system packages via apt."""
     step(T["update_step"])
     env = {**os.environ, "DEBIAN_FRONTEND": "noninteractive"}
     r = run_cmd(["apt-get", "update", "-y"], env=env, check=False)
@@ -358,6 +359,7 @@ def _runtipi_service_running() -> bool:
 
 
 def _wait_for_internet(max_wait: int = 60) -> bool:
+    """Wait for internet connectivity by resolving a known hostname."""
     step(T["internet_check"])
     for i in range(max_wait):
         r = subprocess.run(
@@ -374,7 +376,37 @@ def _wait_for_internet(max_wait: int = 60) -> bool:
     return False
 
 
+def wait_for_time_sync(max_wait: int = 60) -> bool:
+    """Wait for systemd-timesyncd to synchronize the system clock.
+    Returns True if synchronized, False on timeout (non-blocking)."""
+    step(T["time_sync_step"])
+    deadline = time.monotonic() + max_wait
+    i = 0
+    while time.monotonic() < deadline:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        try:
+            r = subprocess.run(
+                ["timedatectl", "show", "--property=NTPSynchronized"],
+                capture_output=True, text=True,
+                timeout=min(2, remaining),
+            )
+        except subprocess.TimeoutExpired:
+            r = None
+        if r is not None and "NTPSynchronized=yes" in r.stdout:
+            done(T["time_sync_done"])
+            return True
+        if i > 0 and i % 10 == 0:
+            out(f"{T['time_sync_wait'].format(s=i)}")
+        i += 1
+        time.sleep(min(1, max(0, deadline - time.monotonic())))
+    err(T["time_sync_warn"])
+    return False
+
+
 def install_runtipi(max_attempts: int = 3) -> bool:
+    """Install Runtipi via the official install script with retries."""
     step(T["runtipi_step"])
     for attempt in range(1, max_attempts + 1):
         if attempt > 1:
@@ -436,6 +468,7 @@ def install_runtipi(max_attempts: int = 3) -> bool:
 
 
 def get_final_ip(max_wait: int = 30) -> str | None:
+    """Get the final non-excluded IP address from network interfaces."""
     for _ in range(max_wait):
         for iface in ["eth0", "wlan0"]:
             try:
@@ -453,6 +486,7 @@ def get_final_ip(max_wait: int = 30) -> str | None:
 
 
 def configure_cockpit(enabled: bool):
+    """Enable or disable Cockpit web management interface."""
     if enabled:
         step(T["cockpit_step"])
         # Le socket et le service sont masqués au build — il faut d'abord
@@ -479,6 +513,7 @@ def configure_cockpit(enabled: bool):
 # ---------------------------------------------------------------------------
 
 def main():
+    """Main entry point: read config, run installation pipeline."""
     global T
     if len(sys.argv) != 2:
         print("Usage: setup.py <config.json>", file=sys.stderr)
@@ -542,6 +577,7 @@ def main():
         err(T["runtipi_retry_boot"].format(hostname=hostname))
         done(T["config_done"])
         return
+    wait_for_time_sync()
     system_update()
     if not install_runtipi():
         try:

@@ -42,6 +42,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "placeholder_pubkey":   "Paste your public key here",
         "label_disable_pwd":    "Disable SSH password authentication (recommended if key provided)",
         "label_timezone":       "Timezone",
+        "toggle_password_visibility": "Toggle password visibility",
         "label_locale":         "Language / Locale",
 
         # configure.html — IP statique
@@ -72,6 +73,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "js_scan_error":        "Scan error — enter the name manually.",
         "js_launching":         "Starting…",
         "js_pwd_mismatch":      "Passwords do not match",
+        "js_server_connection_error": "Server connection error",
+        "js_unknown_error_status":    "Unknown error (status: {status})",
 
         # configure.html — confirmation dialog
         "dlg_title":        "Confirm configuration",
@@ -98,6 +101,10 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "err_ssh_port_invalid":  "SSH port must be a number between 1 and 65535",
         "err_static_ip_invalid": "Invalid static IP address (e.g. 192.168.1.50 or 192.168.1.50/24)",
         "err_static_gw_invalid": "Invalid gateway address",
+        "err_static_ip_required": "Static IP address required if gateway provided",
+        "err_static_gw_required": "Gateway required if static IP provided",
+        "err_static_dns_invalid": "Invalid DNS server address",
+        "err_ssid_too_long":     "WiFi network name (SSID) must be 32 bytes or fewer",
         "warn_wifi_password":   "An incorrect WiFi password will require reflashing the SD card.",
 
         # progress.html
@@ -176,6 +183,10 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "internet_ok":           "Internet connection available",
         "internet_wait":         "Waiting for internet… ({s}s)",
         "internet_fail":         "No internet connection after 60 s — aborting Runtipi installation",
+        "time_sync_step":        "Synchronizing system clock (NTP)…",
+        "time_sync_wait":        "Waiting for NTP clock sync… ({s}s)",
+        "time_sync_done":        "System clock synchronized",
+        "time_sync_warn":        "Clock not synchronized (NTP timeout) — apt may fail with signature errors",
         "runtipi_step":         "Installing Runtipi (Docker included — please wait)…",
         "runtipi_done":         "Runtipi installed and started successfully!",
         "runtipi_fail":         "Runtipi: installation failed (code {code})",
@@ -219,6 +230,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "placeholder_pubkey":   "Collez votre clé publique ici",
         "label_disable_pwd":    "Désactiver l'authentification par mot de passe SSH (recommandé si clé fournie)",
         "label_timezone":       "Fuseau horaire",
+        "toggle_password_visibility": "Afficher/masquer le mot de passe",
         "label_locale":         "Langue / Locale",
 
         "summary_static_ip":    "IP statique (optionnel — recommandé pour un serveur)",
@@ -246,6 +258,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "js_scan_error":        "Erreur lors du scan — saisissez le nom manuellement.",
         "js_launching":         "Lancement en cours…",
         "js_pwd_mismatch":      "Les mots de passe ne correspondent pas",
+        "js_server_connection_error": "Erreur de connexion au serveur",
+        "js_unknown_error_status":    "Erreur inconnue (status: {status})",
 
         "dlg_title":        "Confirmer la configuration",
         "dlg_warning":      "L'installation est irréversible. Un paramètre incorrect nécessiterait de reflasher la carte SD.",
@@ -270,6 +284,10 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "err_ssh_port_invalid":  "Le port SSH doit être un nombre entre 1 et 65535",
         "err_static_ip_invalid": "Adresse IP statique invalide (ex : 192.168.1.50 ou 192.168.1.50/24)",
         "err_static_gw_invalid": "Adresse de passerelle invalide",
+        "err_static_ip_required": "Adresse IP statique requise si passerelle fournie",
+        "err_static_gw_required": "Passerelle requise si IP statique fournie",
+        "err_static_dns_invalid": "Adresse de serveur DNS invalide",
+        "err_ssid_too_long":     "Le nom du réseau WiFi (SSID) doit faire 32 octets maximum",
         "warn_wifi_password":   "Un mot de passe WiFi incorrect nécessitera de reflasher la carte SD.",
 
         "page_progress_title":  "Installation en cours",
@@ -344,6 +362,10 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "internet_ok":           "Connexion internet disponible",
         "internet_wait":         "En attente d'internet… ({s}s)",
         "internet_fail":         "Pas de connexion internet après 60 s — installation de Runtipi annulée",
+        "time_sync_step":        "Synchronisation de l'horloge système (NTP)…",
+        "time_sync_wait":        "En attente de la synchronisation NTP… ({s}s)",
+        "time_sync_done":        "Horloge système synchronisée",
+        "time_sync_warn":        "Horloge non synchronisée (timeout NTP) — apt peut échouer avec erreurs de signature",
         "runtipi_step":         "Installation de Runtipi (Docker inclus — patience)…",
         "runtipi_done":         "Runtipi installé et démarré avec succès !",
         "runtipi_fail":         "Runtipi : installation échouée (code {code})",
@@ -387,6 +409,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "placeholder_pubkey":   "Öffentlichen Schlüssel hier einfügen",
         "label_disable_pwd":    "SSH-Passwortauthentifizierung deaktivieren (empfohlen bei vorhandenem Schlüssel)",
         "label_timezone":       "Zeitzone",
+        "toggle_password_visibility": "Passwort-Sichtbarkeit umschalten",
         "label_locale":         "Sprache / Locale",
 
         "summary_static_ip":    "Statische IP (optional — empfohlen für Server)",
@@ -414,6 +437,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "js_scan_error":        "Scan-Fehler — Namen manuell eingeben.",
         "js_launching":         "Wird gestartet…",
         "js_pwd_mismatch":      "Passwörter stimmen nicht überein",
+        "js_server_connection_error": "Serververbindungsfehler",
+        "js_unknown_error_status":    "Unbekannter Fehler (Status: {status})",
 
         "dlg_title":        "Konfiguration bestätigen",
         "dlg_warning":      "Die Installation ist unwiderruflich. Ein falscher Parameter würde das Neuflashen der SD-Karte erfordern.",
@@ -438,6 +463,10 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "err_ssh_port_invalid":  "SSH-Port muss eine Zahl zwischen 1 und 65535 sein",
         "err_static_ip_invalid": "Ungültige statische IP-Adresse (z.B. 192.168.1.50 oder 192.168.1.50/24)",
         "err_static_gw_invalid": "Ungültige Gateway-Adresse",
+        "err_static_ip_required": "Statische IP-Adresse erforderlich, wenn Gateway angegeben",
+        "err_static_gw_required": "Gateway erforderlich, wenn statische IP angegeben",
+        "err_static_dns_invalid": "Ungültige DNS-Server-Adresse",
+        "err_ssid_too_long":     "WLAN-Netzwerkname (SSID) darf maximal 32 Bytes lang sein",
         "warn_wifi_password":   "Ein falsches WLAN-Passwort erfordert ein erneutes Flashen der SD-Karte.",
 
         "page_progress_title":  "Installation läuft",
@@ -512,6 +541,10 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "internet_ok":           "Internetverbindung verfügbar",
         "internet_wait":         "Warte auf Internet… ({s}s)",
         "internet_fail":         "Keine Internetverbindung nach 60 s — Runtipi-Installation abgebrochen",
+        "time_sync_step":        "Systemzeit wird synchronisiert (NTP)…",
+        "time_sync_wait":        "Warte auf NTP-Zeitsynchronisation… ({s}s)",
+        "time_sync_done":        "Systemzeit synchronisiert",
+        "time_sync_warn":        "Zeit nicht synchronisiert (NTP-Timeout) — apt kann mit Signaturfehlern fehlschlagen",
         "runtipi_step":         "Runtipi wird installiert (Docker inklusive — bitte warten)…",
         "runtipi_done":         "Runtipi erfolgreich installiert und gestartet!",
         "runtipi_fail":         "Runtipi: Installation fehlgeschlagen (Code {code})",
@@ -558,6 +591,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "placeholder_pubkey":   "Pegue su clave pública aquí",
         "label_disable_pwd":    "Desactivar autenticación SSH por contraseña (recomendado si hay clave)",
         "label_timezone":       "Zona horaria",
+        "toggle_password_visibility": "Alternar visibilidad de contraseña",
         "label_locale":         "Idioma / Locale",
 
         "summary_static_ip":    "IP estática (opcional — recomendado para servidor)",
@@ -585,6 +619,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "js_scan_error":        "Error de escaneo — introduzca el nombre manualmente.",
         "js_launching":         "Iniciando…",
         "js_pwd_mismatch":      "Las contraseñas no coinciden",
+        "js_server_connection_error": "Error de conexión al servidor",
+        "js_unknown_error_status":    "Error desconocido (status: {status})",
 
         "dlg_title":        "Confirmar configuración",
         "dlg_warning":      "La instalación es irreversible. Un parámetro incorrecto requeriría volver a flashear la tarjeta SD.",
@@ -609,6 +645,10 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "err_ssh_port_invalid":  "El puerto SSH debe ser un número entre 1 y 65535",
         "err_static_ip_invalid": "Dirección IP estática inválida (ej: 192.168.1.50 o 192.168.1.50/24)",
         "err_static_gw_invalid": "Dirección de puerta de enlace inválida",
+        "err_static_ip_required": "Dirección IP estática requerida si se proporciona puerta de enlace",
+        "err_static_gw_required": "Puerta de enlace requerida si se proporciona IP estática",
+        "err_static_dns_invalid": "Dirección de servidor DNS inválida",
+        "err_ssid_too_long":     "El nombre de red WiFi (SSID) debe tener 32 bytes o menos",
         "warn_wifi_password":   "Una contraseña WiFi incorrecta requerirá volver a flashear la tarjeta SD.",
 
         "page_progress_title":  "Instalación en curso",
@@ -683,6 +723,10 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "internet_ok":           "Conexión a internet disponible",
         "internet_wait":         "Esperando internet… ({s}s)",
         "internet_fail":         "Sin conexión a internet tras 60 s — instalación de Runtipi cancelada",
+        "time_sync_step":        "Sincronizando reloj del sistema (NTP)…",
+        "time_sync_wait":        "Esperando sincronización NTP del reloj… ({s}s)",
+        "time_sync_done":        "Reloj del sistema sincronizado",
+        "time_sync_warn":        "Reloj no sincronizado (tiempo de espera NTP agotado) — apt puede fallar con errores de firma",
         "runtipi_step":         "Instalando Runtipi (Docker incluido — por favor espere)…",
         "runtipi_done":         "¡Runtipi instalado e iniciado correctamente!",
         "runtipi_fail":         "Runtipi: instalación fallida (código {code})",

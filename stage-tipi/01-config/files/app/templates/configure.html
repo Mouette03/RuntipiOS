@@ -12,16 +12,18 @@
 </p>
 
 {% if error %}
-  <div class="alert alert-error">{{ error }}</div>
+  <div class="alert alert-error" id="form-errors">{{ error }}</div>
+{% else %}
+  <div id="form-errors"></div>
 {% endif %}
 
-<form method="POST" action="/configure/apply" autocomplete="off">
+<form id="config-form" method="POST" action="/configure/apply" autocomplete="off" novalidate>
 
   <!-- Hostname -->
   <div class="field">
     <label>{{ t('label_hostname') }}</label>
-    <input type="text" name="hostname" value="runtipios" pattern="[a-zA-Z0-9\-]+" maxlength="63"
-           placeholder="runtipios" required>
+    <input type="text" name="hostname" value="runtipios" maxlength="63"
+           placeholder="runtipios">
     <small style="color:var(--muted);font-size:0.72rem">
       {{ t('hint_hostname')|safe }}
     </small>
@@ -30,33 +32,41 @@
   <!-- Utilisateur SSH -->
   <div class="field">
     <label>{{ t('label_username') }}</label>
-    <input type="text" name="username" pattern="[a-zA-Z0-9_\-]+" maxlength="32"
-           placeholder="pi" required autocomplete="off">
+    <input type="text" name="username" maxlength="32"
+           placeholder="pi" autocomplete="off">
   </div>
 
   <div class="field">
     <label>{{ t('label_password') }}</label>
     <div style="position:relative">
-      <input type="password" name="password" id="pwd1" minlength="8"
-             placeholder="{{ t('placeholder_password') }}" required autocomplete="new-password">
+      <input type="password" name="password" id="pwd1"
+             placeholder="{{ t('placeholder_password') }}" autocomplete="new-password">
       <button type="button" onclick="toggle('pwd1')"
-        style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;line-height:0"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;line-height:0"
+        aria-label="{{ t('toggle_password_visibility') }}" aria-pressed="false">
+        <svg class="pwd-show" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        <svg class="pwd-hide" aria-hidden="true" style="display:none" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+      </button>
     </div>
   </div>
 
   <div class="field">
     <label>{{ t('label_confirm') }}</label>
     <div style="position:relative">
-      <input type="password" name="confirm_password" id="pwd2" minlength="8"
-             placeholder="{{ t('placeholder_confirm') }}" required autocomplete="new-password">
+      <input type="password" name="confirm_password" id="pwd2"
+             placeholder="{{ t('placeholder_confirm') }}" autocomplete="new-password">
       <button type="button" onclick="toggle('pwd2')"
-        style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;line-height:0"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;line-height:0"
+        aria-label="{{ t('toggle_password_visibility') }}" aria-pressed="false">
+        <svg class="pwd-show" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        <svg class="pwd-hide" aria-hidden="true" style="display:none" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+      </button>
     </div>
   </div>
 
   <div class="field">
     <label>{{ t('label_ssh_port') }} <span style="color:var(--muted)">{{ t('label_ssh_port_def') }}</span></label>
-    <input type="number" name="ssh_port" value="22" min="1" max="65535" style="width:120px" required>
+    <input type="number" name="ssh_port" value="22" style="width:120px">
   </div>
 
   <!-- Clé SSH publique -->
@@ -81,7 +91,7 @@
     <label>{{ t('label_locale') }}</label>
     <select name="locale">
       {% for code, label in locales %}
-        <option value="{{ code }}" {% if code == 'en_US.UTF-8' %}selected{% endif %}>{{ label }}</option>
+        <option value="{{ code }}" {% if code == default_locale %}selected{% endif %}>{{ label }}</option>
       {% endfor %}
     </select>
   </div>
@@ -106,18 +116,15 @@
       <p style="margin-bottom:1rem;font-size:0.76rem;color:var(--muted);padding:0.45rem 0.7rem;background:rgba(100,116,139,0.08);border-radius:6px;border-left:3px solid var(--muted);line-height:1.5">ℹ️ {{ t('info_static_ip_priority') }}</p>
       <div class="field">
         <label>{{ t('label_static_ip') }}</label>
-        <input type="text" name="static_ip" placeholder="192.168.1.50"
-               pattern="(\d{1,3}\.){3}\d{1,3}(/\d{1,2})?">
+        <input type="text" name="static_ip" placeholder="192.168.1.50">
       </div>
       <div class="field">
         <label>{{ t('label_gateway') }}</label>
-        <input type="text" name="static_gw" placeholder="192.168.1.1"
-               pattern="(\d{1,3}\.){3}\d{1,3}">
+        <input type="text" name="static_gw" placeholder="192.168.1.1">
       </div>
       <div class="field">
         <label>{{ t('label_dns') }}</label>
-        <input type="text" name="static_dns" value="8.8.8.8"
-               pattern="(\d{1,3}\.){3}\d{1,3}">
+        <input type="text" name="static_dns" value="8.8.8.8">
       </div>
     </div>
   </details>
@@ -159,13 +166,17 @@
     <small id="scan-status" style="color:var(--muted);font-size:0.72rem"></small>
   </div>
 
-  <div class="field">
+<div class="field">
     <label>{{ t('label_wifi_password') }}</label>
     <div style="position:relative">
       <input type="password" name="wifi_password" id="wifi_password"
              placeholder="{{ t('placeholder_wifi_password') }}" autocomplete="off">
       <button type="button" onclick="toggle('wifi_password')"
-        style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;line-height:0"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;line-height:0"
+        aria-label="{{ t('toggle_password_visibility') }}" aria-pressed="false">
+        <svg class="pwd-show" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        <svg class="pwd-hide" aria-hidden="true" style="display:none" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+      </button>
     </div>
     <p style="margin-top:0.45rem;font-size:0.76rem;color:var(--warn);padding:0.5rem 0.7rem;background:rgba(245,158,11,0.08);border-radius:6px;border-left:3px solid var(--warn);line-height:1.5">⚠️ {{ t('warn_wifi_password') }}</p>
   </div>
@@ -221,12 +232,35 @@
     dlg_ethernet: {{ t('dlg_ethernet')|tojson }},
     dlg_enabled:  {{ t('dlg_enabled')|tojson }},
     dlg_disabled: {{ t('dlg_disabled')|tojson }},
+    server_connection_error: {{ t('js_server_connection_error')|tojson }},
+    unknown_error_status:    {{ t('js_unknown_error_status')|tojson }},
+    err_static_ip_invalid:   {{ t('err_static_ip_invalid')|tojson }},
+    err_static_gw_invalid:   {{ t('err_static_gw_invalid')|tojson }},
+    err_static_ip_required:  {{ t('err_static_ip_required')|tojson }},
+    err_static_gw_required:  {{ t('err_static_gw_required')|tojson }},
+    err_static_dns_invalid:  {{ t('err_static_dns_invalid')|tojson }},
+    err_username_required:   {{ t('err_username_required')|tojson }},
+    err_password_short:      {{ t('err_password_short')|tojson }},
+    err_password_mismatch:   {{ t('err_password_mismatch')|tojson }},
+    err_ssh_port_invalid:    {{ t('err_ssh_port_invalid')|tojson }},
+    err_ssid_too_long:       {{ t('err_ssid_too_long')|tojson }},
   };
 </script>
 <script>
   function toggle(id) {
     const el = document.getElementById(id);
-    el.type = el.type === "password" ? "text" : "password";
+    const btn = el.nextElementSibling;
+    const showIcon = btn?.querySelector('.pwd-show');
+    const hideIcon = btn?.querySelector('.pwd-hide');
+    const isVisible = el.type === "text";
+    el.type = isVisible ? "password" : "text";
+    if (showIcon && hideIcon) {
+      showIcon.style.display = isVisible ? '' : 'none';
+      hideIcon.style.display = isVisible ? 'none' : '';
+    }
+    if (btn) {
+      btn.setAttribute('aria-pressed', isVisible ? 'false' : 'true');
+    }
   }
 
   // Scan WiFi et affichage de la liste cliquable
@@ -291,9 +325,53 @@
     // Modale de confirmation avant soumission
     const form   = document.querySelector("form");
     const dialog = document.getElementById("confirm-dialog");
+    const errorsDiv = document.getElementById("form-errors");
+
+    // Validation IP/GW/DNS identique à celle du serveur — bloque la modale si invalide
+    function isValidHostIp(ip) {
+      if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(ip)) return false;
+      return ip.split(".").every(p => Number(p) >= 0 && Number(p) <= 255);
+    }
+    function isValidIp(ip) {
+      const m = ip.match(/^(\d{1,3}\.){3}\d{1,3}(\/(\d{1,2}))?$/);
+      if (!m) return false;
+      if (m[3] !== undefined && (Number(m[3]) < 0 || Number(m[3]) > 32)) return false;
+      return ip.split("/")[0].split(".").every(p => Number(p) >= 0 && Number(p) <= 255);
+    }
+    function showError(msg) {
+      errorsDiv.innerHTML = '<div class="alert alert-error">' + msg + '</div>';
+      errorsDiv.style.display = "block";
+      errorsDiv.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
 
     form.addEventListener("submit", (e) => {
       e.preventDefault();
+      errorsDiv.innerHTML = "";
+
+      const usernameVal = form.querySelector("[name='username']").value.trim();
+      const passwordVal = form.querySelector("[name='password']").value;
+      const confirmVal  = form.querySelector("[name='confirm_password']").value;
+      const sshPortVal  = form.querySelector("[name='ssh_port']").value.trim();
+      const wifiSsidVal = form.querySelector("[name='wifi_ssid']").value.trim();
+      const staticIpVal  = form.querySelector("[name='static_ip']").value.trim();
+      const staticGwVal  = form.querySelector("[name='static_gw']").value.trim();
+      const staticDnsVal = form.querySelector("[name='static_dns']").value.trim();
+
+      // Même nettoyage que le serveur (app.py: re.sub(r"[^a-zA-Z0-9_\-]", ...))
+      if (!usernameVal.replace(/[^a-zA-Z0-9_-]/g, "")) return showError(I18N.err_username_required);
+      if (!passwordVal || passwordVal.length < 8) return showError(I18N.err_password_short);
+      if (passwordVal !== confirmVal) return showError(I18N.err_password_mismatch);
+      const sshPortNum = Number(sshPortVal);
+      if (!sshPortVal || !Number.isInteger(sshPortNum) || sshPortNum < 1 || sshPortNum > 65535) return showError(I18N.err_ssh_port_invalid);
+      if (new TextEncoder().encode(wifiSsidVal).length > 32) return showError(I18N.err_ssid_too_long);
+
+      if (staticIpVal && !isValidIp(staticIpVal)) return showError(I18N.err_static_ip_invalid);
+      if (staticGwVal && !isValidHostIp(staticGwVal)) return showError(I18N.err_static_gw_invalid);
+      if (staticIpVal || staticGwVal) {
+        if (!staticIpVal) return showError(I18N.err_static_ip_required);
+        if (!staticGwVal) return showError(I18N.err_static_gw_required);
+      }
+      if (staticDnsVal && !isValidHostIp(staticDnsVal)) return showError(I18N.err_static_dns_invalid);
 
       document.getElementById("dlg-title").textContent   = I18N.dlg_title;
       document.getElementById("dlg-warning").textContent = "⚠️ " + I18N.dlg_warning;
@@ -341,12 +419,48 @@
     });
 
     document.getElementById("dlg-cancel").addEventListener("click", () => dialog.close());
-    document.getElementById("dlg-confirm").addEventListener("click", () => {
+    document.getElementById("dlg-confirm").addEventListener("click", async () => {
       dialog.close();
       const btn = document.getElementById("submit-btn");
       btn.disabled = true;
       btn.textContent = I18N.launching;
-      form.submit();
+      errorsDiv.innerHTML = "";
+      errorsDiv.style.display = "block";
+
+      const fd = new FormData(form);
+      try {
+        const res = await fetch("/configure/apply", {
+          method: "POST",
+          body: fd,
+          credentials: "include",
+          headers: { "X-Requested-With": "XMLHttpRequest" }
+        });
+
+        if (res.redirected || res.status === 302 || res.status === 301) {
+          window.location.href = res.url || "/progress";
+          return;
+        }
+
+        const html = await res.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, "text/html");
+        const err = doc.querySelector(".alert-error");
+        if (err) {
+          errorsDiv.innerHTML = err.outerHTML;
+          errorsDiv.style.display = "block";
+          errorsDiv.scrollIntoView({ behavior: "smooth", block: "center" });
+          const firstInput = err.querySelector("input, select, textarea");
+          if (firstInput) firstInput.focus();
+        } else if (res.ok) {
+          window.location.href = "/progress";
+        } else {
+          showError(I18N.unknown_error_status.replace('{status}', res.status));
+        }
+      } catch (e) {
+        showError(I18N.server_connection_error);
+      }
+      btn.disabled = false;
+      btn.textContent = "▶ " + {{ t('btn_submit')|tojson }};
     });
     dialog.addEventListener("click", (e) => { if (e.target === dialog) dialog.close(); });
 

@@ -282,17 +282,22 @@ def apply_config():
         "fetch" in request.headers.get("Accept", "")
     )
 
-    def err_response(msg: str):
-        """Retourne erreur selon le mode (AJAX ou standard)."""
-        print(f"[apply_config] validation error (is_ajax={is_ajax}): {msg}", flush=True)
-        if is_ajax:
-            return render_template_string(
-                '<div class="alert alert-error">{{ msg }}</div>', msg=msg
-            ), 400
-        return redirect(f"/configure?error={quote(msg)}")
+    # Séparateur pour transmettre plusieurs erreurs via le fallback redirect
+    ERR_SEP = " • "
 
-    # Validation et nettoyage
+    def err_response(msgs: list):
+        """Retourne les erreurs selon le mode (AJAX ou standard)."""
+        if is_ajax:
+            html = "".join(
+                render_template_string('<div class="alert alert-error">{{ msg }}</div>', msg=m)
+                for m in msgs
+            )
+            return html, 400
+        return redirect(f"/configure?error={quote(ERR_SEP.join(msgs))}")
+
+    # Validation et nettoyage — toutes les erreurs sont collectées
     T = get_t(session.get("lang", DEFAULT_LANG))
+    errors: list = []
 
     hostname = re.sub(r"[^a-zA-Z0-9\-]", "", request.form.get("hostname", "runtipios"))[:63] or "runtipios"
     username = re.sub(r"[^a-zA-Z0-9_\-]", "", request.form.get("username", ""))[:32]
@@ -301,19 +306,20 @@ def apply_config():
     ssh_port_raw = request.form.get("ssh_port", "22").strip()
 
     if not username:
-        return err_response(T['err_username_required'])
+        errors.append(T['err_username_required'])
     if not password or len(password) < 8:
-        return err_response(T['err_password_short'])
+        errors.append(T['err_password_short'])
     if password != confirm:
-        return err_response(T['err_password_mismatch'])
+        errors.append(T['err_password_mismatch'])
 
+    ssh_port = "22"
     try:
         ssh_port_int = int(ssh_port_raw)
         if not (1 <= ssh_port_int <= 65535):
             raise ValueError
         ssh_port = str(ssh_port_int)
     except ValueError:
-        return err_response(T['err_ssh_port_invalid'])
+        errors.append(T['err_ssh_port_invalid'])
 
     ssh_key = request.form.get("ssh_key", "").strip()
     disable_pass = request.form.get("disable_password_auth") == "on"
@@ -341,25 +347,28 @@ def apply_config():
         return all(0 <= int(p) <= 255 for p in parts[0].split("."))
 
     if static_ip and not _valid_ip(static_ip):
-        return err_response(T['err_static_ip_invalid'])
+        errors.append(T['err_static_ip_invalid'])
     if static_gw and not _valid_host_ip(static_gw):
-        return err_response(T['err_static_gw_invalid'])
+        errors.append(T['err_static_gw_invalid'])
     # Validation croisée : IP et GW doivent être fournis ensemble
     if static_ip or static_gw:
         if not static_ip:
-            return err_response(T['err_static_ip_required'])
+            errors.append(T['err_static_ip_required'])
         if not static_gw:
-            return err_response(T['err_static_gw_required'])
+            errors.append(T['err_static_gw_required'])
     # Validation DNS si fourni
     if static_dns and not _valid_host_ip(static_dns):
-        return err_response(T['err_static_dns_invalid'])
+        errors.append(T['err_static_dns_invalid'])
 
     wifi_ssid = request.form.get("wifi_ssid", "").strip()
     wifi_password = request.form.get("wifi_password", "").strip()
     cockpit_enabled = request.form.get("cockpit_enabled") == "1"
 
     if len(wifi_ssid.encode("utf-8")) > 32:
-        return err_response(T['err_ssid_too_long'])
+        errors.append(T['err_ssid_too_long'])
+
+    if errors:
+        return err_response(errors)
 
     _config = {
         "hostname":              hostname,

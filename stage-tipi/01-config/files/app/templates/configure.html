@@ -329,7 +329,7 @@
 
     // Scroll auto si erreur rendue par le serveur (redirect fallback)
     if (errorsDiv.querySelector(".alert-error")) {
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      setTimeout(() => window.scrollTo(0, 0), 0);
     }
 
     // Validation IP/GW/DNS identique à celle du serveur — bloque la modale si invalide
@@ -346,7 +346,7 @@
     function showError(msg) {
       errorsDiv.innerHTML = '<div class="alert alert-error">' + msg + '</div>';
       errorsDiv.style.display = "block";
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      setTimeout(() => window.scrollTo(0, 0), 0);
     }
 
     form.addEventListener("submit", (e) => {
@@ -453,7 +453,7 @@
         if (err) {
           errorsDiv.innerHTML = err.outerHTML;
           errorsDiv.style.display = "block";
-          window.scrollTo({ top: 0, behavior: "smooth" });
+          setTimeout(() => window.scrollTo(0, 0), 0);
           const firstInput = err.querySelector("input, select, textarea");
           if (firstInput) firstInput.focus();
         } else if (res.ok) {

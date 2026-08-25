@@ -12,7 +12,11 @@
 </p>
 
 {% if error %}
-  <div class="alert alert-error" id="form-errors">{{ error }}</div>
+  <div id="form-errors">
+    {%- for e in error.split(' • ') %}
+    <div class="alert alert-error">{{ e }}</div>
+    {%- endfor %}
+  </div>
 {% else %}
   <div id="form-errors"></div>
 {% endif %}
@@ -327,6 +331,11 @@
     const dialog = document.getElementById("confirm-dialog");
     const errorsDiv = document.getElementById("form-errors");
 
+    // Scroll auto si erreur rendue par le serveur (redirect fallback)
+    if (errorsDiv.querySelector(".alert-error")) {
+      setTimeout(() => window.scrollTo(0, 0), 0);
+    }
+
     // Validation IP/GW/DNS identique à celle du serveur — bloque la modale si invalide
     function isValidHostIp(ip) {
       if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(ip)) return false;
@@ -338,10 +347,11 @@
       if (m[3] !== undefined && (Number(m[3]) < 0 || Number(m[3]) > 32)) return false;
       return ip.split("/")[0].split(".").every(p => Number(p) >= 0 && Number(p) <= 255);
     }
-    function showError(msg) {
-      errorsDiv.innerHTML = '<div class="alert alert-error">' + msg + '</div>';
+    function showError(msgs) {
+      const items = Array.isArray(msgs) ? msgs : [msgs];
+      errorsDiv.innerHTML = items.map(m => '<div class="alert alert-error">' + m + '</div>').join("");
       errorsDiv.style.display = "block";
-      errorsDiv.scrollIntoView({ behavior: "smooth", block: "center" });
+      setTimeout(() => window.scrollTo(0, 0), 0);
     }
 
     form.addEventListener("submit", (e) => {
@@ -358,20 +368,22 @@
       const staticDnsVal = form.querySelector("[name='static_dns']").value.trim();
 
       // Même nettoyage que le serveur (app.py: re.sub(r"[^a-zA-Z0-9_\-]", ...))
-      if (!usernameVal.replace(/[^a-zA-Z0-9_-]/g, "")) return showError(I18N.err_username_required);
-      if (!passwordVal || passwordVal.length < 8) return showError(I18N.err_password_short);
-      if (passwordVal !== confirmVal) return showError(I18N.err_password_mismatch);
+      const errors = [];
+      if (!usernameVal.replace(/[^a-zA-Z0-9_-]/g, "")) errors.push(I18N.err_username_required);
+      if (!passwordVal || passwordVal.length < 8) errors.push(I18N.err_password_short);
+      if (passwordVal !== confirmVal) errors.push(I18N.err_password_mismatch);
       const sshPortNum = Number(sshPortVal);
-      if (!sshPortVal || !Number.isInteger(sshPortNum) || sshPortNum < 1 || sshPortNum > 65535) return showError(I18N.err_ssh_port_invalid);
-      if (new TextEncoder().encode(wifiSsidVal).length > 32) return showError(I18N.err_ssid_too_long);
+      if (!sshPortVal || !Number.isInteger(sshPortNum) || sshPortNum < 1 || sshPortNum > 65535) errors.push(I18N.err_ssh_port_invalid);
+      if (new TextEncoder().encode(wifiSsidVal).length > 32) errors.push(I18N.err_ssid_too_long);
 
-      if (staticIpVal && !isValidIp(staticIpVal)) return showError(I18N.err_static_ip_invalid);
-      if (staticGwVal && !isValidHostIp(staticGwVal)) return showError(I18N.err_static_gw_invalid);
+      if (staticIpVal && !isValidIp(staticIpVal)) errors.push(I18N.err_static_ip_invalid);
+      if (staticGwVal && !isValidHostIp(staticGwVal)) errors.push(I18N.err_static_gw_invalid);
       if (staticIpVal || staticGwVal) {
-        if (!staticIpVal) return showError(I18N.err_static_ip_required);
-        if (!staticGwVal) return showError(I18N.err_static_gw_required);
+        if (!staticIpVal) errors.push(I18N.err_static_ip_required);
+        if (!staticGwVal) errors.push(I18N.err_static_gw_required);
       }
-      if (staticDnsVal && !isValidHostIp(staticDnsVal)) return showError(I18N.err_static_dns_invalid);
+      if (staticDnsVal && !isValidHostIp(staticDnsVal)) errors.push(I18N.err_static_dns_invalid);
+      if (errors.length) return showError(errors);
 
       document.getElementById("dlg-title").textContent   = I18N.dlg_title;
       document.getElementById("dlg-warning").textContent = "⚠️ " + I18N.dlg_warning;
@@ -444,13 +456,11 @@
         const html = await res.text();
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, "text/html");
-        const err = doc.querySelector(".alert-error");
-        if (err) {
-          errorsDiv.innerHTML = err.outerHTML;
+        const errs = doc.querySelectorAll(".alert-error");
+        if (errs.length) {
+          errorsDiv.innerHTML = [...errs].map(e => e.outerHTML).join("");
           errorsDiv.style.display = "block";
-          errorsDiv.scrollIntoView({ behavior: "smooth", block: "center" });
-          const firstInput = err.querySelector("input, select, textarea");
-          if (firstInput) firstInput.focus();
+          setTimeout(() => window.scrollTo(0, 0), 0);
         } else if (res.ok) {
           window.location.href = "/progress";
         } else {
